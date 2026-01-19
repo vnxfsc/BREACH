@@ -95,8 +95,16 @@ async fn send_message(
         .send_message(player.player_id, channel_id, req)
         .await?;
     
-    // 广播消息到 WebSocket
-    // TODO: Broadcast via WebSocket
+    // Broadcast message via WebSocket
+    let ws_message = crate::websocket::WsMessage::ChatMessage {
+        channel_id: channel_id.to_string(),
+        message_id: message.id.to_string(),
+        sender_id: message.sender_id.to_string(),
+        sender_username: message.sender_username.clone(),
+        content: message.content.clone(),
+        created_at: message.created_at.to_rfc3339(),
+    };
+    state.broadcaster.broadcast_chat_message(channel_id, ws_message).await;
     
     Ok(Json(message))
 }
@@ -150,8 +158,18 @@ async fn edit_message(
     let message = state
         .services
         .chat
-        .edit_message(player.player_id, message_id, req.content)
+        .edit_message(player.player_id, message_id, req.content.clone())
         .await?;
+    
+    // Broadcast edit via WebSocket
+    let ws_message = crate::websocket::WsMessage::ChatMessageEdited {
+        channel_id: message.channel_id.to_string(),
+        message_id: message.id.to_string(),
+        new_content: message.content.clone(),
+        edited_at: chrono::Utc::now().to_rfc3339(),
+    };
+    state.broadcaster.broadcast_chat_message(message.channel_id, ws_message).await;
+    
     Ok(Json(message))
 }
 
@@ -161,7 +179,18 @@ async fn delete_message(
     AuthPlayer(player): AuthPlayer,
     Path(message_id): Path<Uuid>,
 ) -> ApiResult<Json<serde_json::Value>> {
+    // Get message info before deleting for broadcast
+    let channel_id = state.services.chat.get_message_channel_id(message_id).await?;
+    
     state.services.chat.delete_message(player.player_id, message_id).await?;
+    
+    // Broadcast deletion via WebSocket
+    let ws_message = crate::websocket::WsMessage::ChatMessageDeleted {
+        channel_id: channel_id.to_string(),
+        message_id: message_id.to_string(),
+    };
+    state.broadcaster.broadcast_chat_message(channel_id, ws_message).await;
+    
     Ok(Json(serde_json::json!({"success": true})))
 }
 

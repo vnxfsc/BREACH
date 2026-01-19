@@ -177,7 +177,7 @@ pub struct TitanListingInfo {
     pub species_id: Option<i32>,
     pub level: i32,
     pub nickname: Option<String>,
-    pub genes: Option<serde_json::Value>,
+    pub genes: Vec<u8>,
 }
 
 /// Place bid request

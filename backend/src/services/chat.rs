@@ -1,6 +1,7 @@
 //! Chat service - Real-time messaging functionality
 
 use chrono::{Duration, Utc};
+use redis::AsyncCommands;
 use sqlx::Row;
 use uuid::Uuid;
 
@@ -15,6 +16,12 @@ use crate::models::{
 /// Maximum message length
 const MAX_MESSAGE_LENGTH: usize = 1000;
 
+/// Redis key prefix for online status
+const ONLINE_STATUS_PREFIX: &str = "player:online:";
+
+/// Online status TTL in seconds (5 minutes)
+const ONLINE_STATUS_TTL: i64 = 300;
+
 /// Chat service
 #[derive(Clone)]
 pub struct ChatService {
@@ -24,6 +31,37 @@ pub struct ChatService {
 impl ChatService {
     pub fn new(db: Database) -> Self {
         Self { db }
+    }
+    
+    /// Set player online status in Redis
+    pub async fn set_player_online(&self, player_id: Uuid) -> ApiResult<()> {
+        let key = format!("{}{}", ONLINE_STATUS_PREFIX, player_id);
+        let mut conn = self.db.redis.clone();
+        let _: () = conn.set_ex(&key, "1", ONLINE_STATUS_TTL as u64).await
+            .map_err(|e| AppError::Internal(e.into()))?;
+        Ok(())
+    }
+    
+    /// Check if a player is online
+    pub async fn is_player_online(&self, player_id: Uuid) -> bool {
+        let key = format!("{}{}", ONLINE_STATUS_PREFIX, player_id);
+        let mut conn = self.db.redis.clone();
+        let result: Result<Option<String>, _> = conn.get(&key).await;
+        result.map(|v| v.is_some()).unwrap_or(false)
+    }
+    
+    /// Refresh player online status (heartbeat)
+    pub async fn refresh_online_status(&self, player_id: Uuid) -> ApiResult<()> {
+        self.set_player_online(player_id).await
+    }
+    
+    /// Set player offline
+    pub async fn set_player_offline(&self, player_id: Uuid) -> ApiResult<()> {
+        let key = format!("{}{}", ONLINE_STATUS_PREFIX, player_id);
+        let mut conn = self.db.redis.clone();
+        let _: () = conn.del(&key).await
+            .map_err(|e| AppError::Internal(e.into()))?;
+        Ok(())
     }
 
     // ============================================
@@ -72,7 +110,7 @@ impl ChatService {
             let channel_id: Uuid = row.get("id");
             let channel_type: ChatChannelType = row.get("channel_type");
             
-            // 获取未读数
+            // Get unread count
             let unread_count: i32 = sqlx::query_scalar(
                 "SELECT get_unread_count($1, $2)::INT"
             )
@@ -82,7 +120,7 @@ impl ChatService {
             .await
             .unwrap_or(0);
 
-            // 获取最后一条消息
+            // Get last message
             let last_message: Option<LastMessageInfo> = sqlx::query(
                 r#"
                 SELECT m.content, m.created_at, p.username
@@ -102,22 +140,28 @@ impl ChatService {
                 sent_at: r.get("created_at"),
             });
 
-            // 获取私聊对方信息
+            // Get private chat participant info
             let participant: Option<ParticipantInfo> = if channel_type == ChatChannelType::Private {
                 let other_id: Option<Uuid> = row.get("other_participant_id");
                 if let Some(pid) = other_id {
-                    sqlx::query(
+                    let player_row = sqlx::query(
                         "SELECT id, username, level FROM players WHERE id = $1"
                     )
                     .bind(pid)
                     .fetch_optional(&self.db.pg)
-                    .await?
-                    .map(|r| ParticipantInfo {
-                        id: r.get("id"),
-                        username: r.get("username"),
-                        level: r.get("level"),
-                        is_online: false, // TODO: 从 Redis 获取在线状态
-                    })
+                    .await?;
+                    
+                    if let Some(r) = player_row {
+                        let is_online = self.is_player_online(pid).await;
+                        Some(ParticipantInfo {
+                            id: r.get("id"),
+                            username: r.get("username"),
+                            level: r.get("level"),
+                            is_online,
+                        })
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -152,7 +196,7 @@ impl ChatService {
             return Err(AppError::BadRequest("Cannot chat with yourself".into()));
         }
 
-        // 检查是否被屏蔽
+        // Check if blocked
         let is_blocked: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM chat_blocked_users WHERE blocker_id = $1 AND blocked_id = $2)"
         )
@@ -165,7 +209,7 @@ impl ChatService {
             return Err(AppError::Forbidden("You are blocked by this player".into()));
         }
 
-        // 获取或创建频道
+        // Get or create channel
         let channel_id: Uuid = sqlx::query_scalar(
             "SELECT get_or_create_private_channel($1, $2)"
         )
@@ -186,7 +230,7 @@ impl ChatService {
 
     /// Get guild channel (creates if not exists)
     pub async fn get_guild_channel(&self, guild_id: Uuid) -> ApiResult<ChatChannel> {
-        // 尝试获取现有频道
+        // Try to get existing channel
         let existing = sqlx::query_as::<_, ChatChannel>(
             "SELECT * FROM chat_channels WHERE guild_id = $1 AND channel_type = 'guild'"
         )
@@ -198,7 +242,7 @@ impl ChatService {
             return Ok(channel);
         }
 
-        // 获取公会名称
+        // Get guild name
         let guild_name: Option<String> = sqlx::query_scalar(
             "SELECT name FROM guilds WHERE id = $1"
         )
@@ -208,7 +252,7 @@ impl ChatService {
 
         let guild_name = guild_name.ok_or_else(|| AppError::NotFound("Guild not found".into()))?;
 
-        // 创建频道
+        // Create channel
         let channel = sqlx::query_as::<_, ChatChannel>(
             r#"
             INSERT INTO chat_channels (channel_type, name, guild_id)
@@ -235,7 +279,7 @@ impl ChatService {
         channel_id: Uuid,
         req: SendMessageRequest,
     ) -> ApiResult<MessageResponse> {
-        // 验证内容
+        // Validate content
         let content = req.content.trim();
         if content.is_empty() {
             return Err(AppError::BadRequest("Message cannot be empty".into()));
@@ -247,10 +291,10 @@ impl ChatService {
             )));
         }
 
-        // 验证频道访问权限
+        // Verify channel access
         self.verify_channel_access(sender_id, channel_id).await?;
 
-        // 检查是否在频道中被屏蔽（仅私聊）
+        // Check if blocked in channel (private only)
         let channel = sqlx::query_as::<_, ChatChannel>(
             "SELECT * FROM chat_channels WHERE id = $1"
         )
@@ -280,7 +324,7 @@ impl ChatService {
             }
         }
 
-        // 插入消息
+        // Insert message
         let message = sqlx::query_as::<_, ChatMessage>(
             r#"
             INSERT INTO chat_messages (channel_id, sender_id, content, reply_to_id)
@@ -295,13 +339,13 @@ impl ChatService {
         .fetch_one(&self.db.pg)
         .await?;
 
-        // 更新频道最后消息时间
+        // Update channel last message time
         sqlx::query("UPDATE chat_channels SET last_message_at = NOW() WHERE id = $1")
             .bind(channel_id)
             .execute(&self.db.pg)
             .await?;
 
-        // 构建响应
+        // Build response
         let response = self.build_message_response(message).await?;
 
         Ok(response)
@@ -314,10 +358,10 @@ impl ChatService {
         channel_id: Uuid,
         query: MessagesQuery,
     ) -> ApiResult<Vec<MessageResponse>> {
-        // 验证访问权限
+        // Verify access
         self.verify_channel_access(player_id, channel_id).await?;
 
-        // 获取被屏蔽的用户列表
+        // Get blocked user list
         let blocked_ids: Vec<Uuid> = sqlx::query_scalar(
             "SELECT blocked_id FROM chat_blocked_users WHERE blocker_id = $1"
         )
@@ -366,7 +410,7 @@ impl ChatService {
             responses.push(self.build_message_response(msg).await?);
         }
 
-        // 按时间正序返回
+        // Return in chronological order
         responses.reverse();
 
         Ok(responses)
@@ -387,7 +431,7 @@ impl ChatService {
             return Err(AppError::BadRequest("Message too long".into()));
         }
 
-        // 验证所有权
+        // Verify ownership
         let message = sqlx::query_as::<_, ChatMessage>(
             "SELECT * FROM chat_messages WHERE id = $1 AND sender_id = $2 AND is_deleted = FALSE"
         )
@@ -398,13 +442,13 @@ impl ChatService {
 
         let message = message.ok_or_else(|| AppError::NotFound("Message not found".into()))?;
 
-        // 检查是否可编辑（5分钟内）
+        // Check if editable (within 5 minutes)
         let age = Utc::now() - message.created_at;
         if age > Duration::minutes(5) {
             return Err(AppError::BadRequest("Message can only be edited within 5 minutes".into()));
         }
 
-        // 更新消息
+        // Update message
         let updated = sqlx::query_as::<_, ChatMessage>(
             r#"
             UPDATE chat_messages
@@ -441,6 +485,18 @@ impl ChatService {
 
         Ok(())
     }
+    
+    /// Get channel ID for a message
+    pub async fn get_message_channel_id(&self, message_id: Uuid) -> ApiResult<Uuid> {
+        let channel_id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT channel_id FROM chat_messages WHERE id = $1"
+        )
+        .bind(message_id)
+        .fetch_optional(&self.db.pg)
+        .await?;
+        
+        channel_id.ok_or_else(|| AppError::NotFound("Message not found".into()))
+    }
 
     // ============================================
     // Read Status
@@ -448,7 +504,7 @@ impl ChatService {
 
     /// Mark channel as read
     pub async fn mark_as_read(&self, player_id: Uuid, channel_id: Uuid) -> ApiResult<()> {
-        // 获取最新消息 ID
+        // Get latest message ID
         let last_message_id: Option<Uuid> = sqlx::query_scalar(
             "SELECT id FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 1"
         )
@@ -571,7 +627,7 @@ impl ChatService {
         message_id: Uuid,
         req: ReportMessageRequest,
     ) -> ApiResult<ChatReport> {
-        // 获取消息和发送者
+        // Get message and sender
         let message = sqlx::query_as::<_, ChatMessage>(
             "SELECT * FROM chat_messages WHERE id = $1"
         )
@@ -660,7 +716,7 @@ impl ChatService {
             .map(|r| (r.get::<Option<String>, _>("username"), Some(r.get::<i32, _>("level"))))
             .unwrap_or((None, None));
 
-        // 获取回复信息
+        // Get reply info
         let reply_to = if let Some(reply_id) = msg.reply_to_id {
             sqlx::query(
                 r#"

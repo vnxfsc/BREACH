@@ -38,7 +38,7 @@ impl MarketplaceService {
         seller_id: Uuid,
         req: CreateListingRequest,
     ) -> ApiResult<MarketplaceListing> {
-        // 验证 Titan 所有权
+        // Verify Titan ownership
         let titan = sqlx::query_scalar::<_, Uuid>(
             "SELECT id FROM player_titans WHERE id = $1 AND player_id = $2"
         )
@@ -51,7 +51,7 @@ impl MarketplaceService {
             return Err(AppError::NotFound("Titan not found or not owned by you".into()));
         }
 
-        // 检查是否已有活跃挂单
+        // Check if already listed
         let existing = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM marketplace_listings WHERE titan_id = $1 AND status = 'active'"
         )
@@ -63,12 +63,12 @@ impl MarketplaceService {
             return Err(AppError::BadRequest("Titan is already listed".into()));
         }
 
-        // 验证拍卖参数
+        // Validate auction parameters
         if req.listing_type == ListingType::Auction && req.min_price.is_none() {
             return Err(AppError::BadRequest("Auction requires min_price".into()));
         }
 
-        // 创建挂单
+        // Create listing
         let expires_at = Utc::now() + Duration::hours(req.duration_hours);
         
         let listing = sqlx::query_as::<_, MarketplaceListing>(
@@ -97,13 +97,13 @@ impl MarketplaceService {
         listing_id: Uuid,
         viewer_id: Option<Uuid>,
     ) -> ApiResult<ListingResponse> {
-        // 增加浏览量
+        // Increment view count
         sqlx::query("UPDATE marketplace_listings SET views = views + 1 WHERE id = $1")
             .bind(listing_id)
             .execute(&self.db.pg)
             .await?;
 
-        // 获取挂单详情
+        // Get listing details
         let row = sqlx::query(
             r#"
             SELECT 
@@ -166,8 +166,70 @@ impl MarketplaceService {
         query: MarketplaceSearchQuery,
         viewer_id: Option<Uuid>,
     ) -> ApiResult<SearchResultsResponse> {
-        // 构建动态查询
-        let mut sql = String::from(
+        // Build dynamic query with proper parameter tracking
+        let mut param_idx = 2; // $1 is viewer_id
+        let mut conditions = Vec::new();
+        
+        // Track which parameters to bind
+        let mut bind_element = false;
+        let mut bind_min_threat = false;
+        let mut bind_max_threat = false;
+        let mut bind_min_price = false;
+        let mut bind_max_price = false;
+        let mut bind_min_level = false;
+        let mut bind_listing_type = false;
+
+        if query.element.is_some() {
+            conditions.push(format!("pt.element = ${}", param_idx));
+            param_idx += 1;
+            bind_element = true;
+        }
+        if query.min_threat_class.is_some() {
+            conditions.push(format!("pt.threat_class >= ${}", param_idx));
+            param_idx += 1;
+            bind_min_threat = true;
+        }
+        if query.max_threat_class.is_some() {
+            conditions.push(format!("pt.threat_class <= ${}", param_idx));
+            param_idx += 1;
+            bind_max_threat = true;
+        }
+        if query.min_price.is_some() {
+            conditions.push(format!("l.price >= ${}", param_idx));
+            param_idx += 1;
+            bind_min_price = true;
+        }
+        if query.max_price.is_some() {
+            conditions.push(format!("l.price <= ${}", param_idx));
+            param_idx += 1;
+            bind_max_price = true;
+        }
+        if query.min_level.is_some() {
+            conditions.push(format!("pt.level >= ${}", param_idx));
+            param_idx += 1;
+            bind_min_level = true;
+        }
+        if query.listing_type.is_some() {
+            conditions.push(format!("l.listing_type = ${}", param_idx));
+            bind_listing_type = true;
+        }
+
+        // Build WHERE clause
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!(" AND {}", conditions.join(" AND "))
+        };
+
+        // Sorting
+        let order = match query.sort_by.as_deref() {
+            Some("price_asc") => "l.price ASC",
+            Some("price_desc") => "l.price DESC",
+            Some("ending_soon") => "l.expires_at ASC",
+            _ => "l.created_at DESC",
+        };
+
+        let sql = format!(
             r#"
             SELECT 
                 l.id, l.seller_id, l.titan_id, l.listing_type, l.price, l.min_price,
@@ -182,60 +244,38 @@ impl MarketplaceService {
             FROM marketplace_listings l
             JOIN players p ON l.seller_id = p.id
             JOIN player_titans pt ON l.titan_id = pt.id
-            WHERE l.status = 'active'
-            "#
+            WHERE l.status = 'active'{}
+            ORDER BY {} LIMIT {} OFFSET {}
+            "#,
+            where_clause, order, query.limit + 1, query.offset
         );
 
-        let mut conditions = Vec::new();
-
-        if query.element.is_some() {
-            conditions.push("pt.element = $2".to_string());
+        // Build query with only the necessary bindings
+        let mut db_query = sqlx::query(&sql).bind(viewer_id);
+        
+        if bind_element {
+            db_query = db_query.bind(query.element);
         }
-        if query.min_threat_class.is_some() {
-            conditions.push(format!("pt.threat_class >= ${}", conditions.len() + 2));
+        if bind_min_threat {
+            db_query = db_query.bind(query.min_threat_class);
         }
-        if query.max_threat_class.is_some() {
-            conditions.push(format!("pt.threat_class <= ${}", conditions.len() + 2));
+        if bind_max_threat {
+            db_query = db_query.bind(query.max_threat_class);
         }
-        if query.min_price.is_some() {
-            conditions.push(format!("l.price >= ${}", conditions.len() + 2));
+        if bind_min_price {
+            db_query = db_query.bind(query.min_price);
         }
-        if query.max_price.is_some() {
-            conditions.push(format!("l.price <= ${}", conditions.len() + 2));
+        if bind_max_price {
+            db_query = db_query.bind(query.max_price);
         }
-        if query.min_level.is_some() {
-            conditions.push(format!("pt.level >= ${}", conditions.len() + 2));
+        if bind_min_level {
+            db_query = db_query.bind(query.min_level);
         }
-        if query.listing_type.is_some() {
-            conditions.push(format!("l.listing_type = ${}", conditions.len() + 2));
-        }
-
-        for cond in &conditions {
-            sql.push_str(" AND ");
-            sql.push_str(cond);
+        if bind_listing_type {
+            db_query = db_query.bind(query.listing_type);
         }
 
-        // 排序
-        let order = match query.sort_by.as_deref() {
-            Some("price_asc") => "l.price ASC",
-            Some("price_desc") => "l.price DESC",
-            Some("ending_soon") => "l.expires_at ASC",
-            _ => "l.created_at DESC",
-        };
-        sql.push_str(&format!(" ORDER BY {} LIMIT {} OFFSET {}", order, query.limit + 1, query.offset));
-
-        // 执行查询（简化版本，实际应使用参数化查询）
-        let rows = sqlx::query(&sql)
-            .bind(viewer_id)
-            .bind(query.element)
-            .bind(query.min_threat_class)
-            .bind(query.max_threat_class)
-            .bind(query.min_price)
-            .bind(query.max_price)
-            .bind(query.min_level)
-            .bind(query.listing_type)
-            .fetch_all(&self.db.pg)
-            .await?;
+        let rows = db_query.fetch_all(&self.db.pg).await?;
 
         let has_more = rows.len() as i64 > query.limit;
         let listings: Vec<ListingResponse> = rows
@@ -272,7 +312,7 @@ impl MarketplaceService {
             })
             .collect();
 
-        // 获取总数
+        // Get total count
         let total_count = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM marketplace_listings WHERE status = 'active'"
         )
@@ -315,7 +355,7 @@ impl MarketplaceService {
     pub async fn buy_listing(&self, buyer_id: Uuid, listing_id: Uuid) -> ApiResult<MarketplaceTransaction> {
         let mut tx = self.db.pg.begin().await?;
 
-        // 获取并锁定挂单
+        // Get and lock listing
         let listing = sqlx::query_as::<_, MarketplaceListing>(
             r#"
             SELECT * FROM marketplace_listings
@@ -329,16 +369,16 @@ impl MarketplaceService {
 
         let listing = listing.ok_or_else(|| AppError::NotFound("Listing not found or not available".into()))?;
 
-        // 不能购买自己的
+        // Cannot buy your own listing
         if listing.seller_id == buyer_id {
             return Err(AppError::BadRequest("Cannot buy your own listing".into()));
         }
 
-        // 计算费用
+        // Calculate fees
         let fee = (listing.price * PLATFORM_FEE_BPS) / 10000;
         let seller_receives = listing.price - fee;
 
-        // 更新挂单状态
+        // Update listing status
         sqlx::query(
             r#"
             UPDATE marketplace_listings
@@ -352,7 +392,7 @@ impl MarketplaceService {
         .execute(&mut *tx)
         .await?;
 
-        // 转移 Titan 所有权
+        // Transfer Titan ownership
         sqlx::query(
             "UPDATE player_titans SET player_id = $1 WHERE id = $2"
         )
@@ -361,7 +401,7 @@ impl MarketplaceService {
         .execute(&mut *tx)
         .await?;
 
-        // 创建交易记录
+        // Create transaction record
         let transaction = sqlx::query_as::<_, MarketplaceTransaction>(
             r#"
             INSERT INTO marketplace_transactions
@@ -380,7 +420,7 @@ impl MarketplaceService {
         .fetch_one(&mut *tx)
         .await?;
 
-        // 记录价格历史
+        // Record price history
         sqlx::query(
             r#"
             INSERT INTO price_history (element, threat_class, species_id, price, transaction_type)
@@ -411,7 +451,7 @@ impl MarketplaceService {
     ) -> ApiResult<AuctionBid> {
         let mut tx = self.db.pg.begin().await?;
 
-        // 获取并锁定挂单
+        // Get and lock listing
         let listing = sqlx::query_as::<_, MarketplaceListing>(
             r#"
             SELECT * FROM marketplace_listings
@@ -425,7 +465,7 @@ impl MarketplaceService {
 
         let listing = listing.ok_or_else(|| AppError::NotFound("Auction not found".into()))?;
 
-        // 验证
+        // Validate
         if listing.seller_id == bidder_id {
             return Err(AppError::BadRequest("Cannot bid on your own auction".into()));
         }
@@ -434,13 +474,13 @@ impl MarketplaceService {
             return Err(AppError::BadRequest("Auction has ended".into()));
         }
 
-        // 检查最低出价
+        // Check minimum bid
         let min_price = listing.min_price.unwrap_or(listing.price);
         if amount < min_price {
             return Err(AppError::BadRequest(format!("Bid must be at least {}", min_price)));
         }
 
-        // 获取当前最高出价
+        // Get current highest bid
         let current_highest: Option<i64> = sqlx::query_scalar(
             "SELECT MAX(amount) FROM auction_bids WHERE listing_id = $1"
         )
@@ -454,7 +494,7 @@ impl MarketplaceService {
             }
         }
 
-        // 取消之前的最高出价标记
+        // Cancel previous winning bid marker
         sqlx::query(
             "UPDATE auction_bids SET is_winning = FALSE WHERE listing_id = $1 AND is_winning = TRUE"
         )
@@ -462,7 +502,7 @@ impl MarketplaceService {
         .execute(&mut *tx)
         .await?;
 
-        // 创建出价
+        // Create bid
         let bid = sqlx::query_as::<_, AuctionBid>(
             r#"
             INSERT INTO auction_bids (listing_id, bidder_id, amount, is_winning)
@@ -513,7 +553,7 @@ impl MarketplaceService {
     pub async fn end_auction(&self, listing_id: Uuid) -> ApiResult<Option<MarketplaceTransaction>> {
         let mut tx = self.db.pg.begin().await?;
 
-        // 获取挂单
+        // Get listing
         let listing = sqlx::query_as::<_, MarketplaceListing>(
             "SELECT * FROM marketplace_listings WHERE id = $1 AND listing_type = 'auction' FOR UPDATE"
         )
@@ -527,7 +567,7 @@ impl MarketplaceService {
             return Err(AppError::BadRequest("Auction is not active".into()));
         }
 
-        // 获取最高出价
+        // Get winning bid
         let winning_bid = sqlx::query_as::<_, AuctionBid>(
             "SELECT * FROM auction_bids WHERE listing_id = $1 AND is_winning = TRUE"
         )
@@ -537,11 +577,11 @@ impl MarketplaceService {
 
         match winning_bid {
             Some(bid) => {
-                // 有中标者 - 完成交易
+                // Has winner - complete transaction
                 let fee = (bid.amount * PLATFORM_FEE_BPS) / 10000;
                 let seller_receives = bid.amount - fee;
 
-                // 更新挂单
+                // Update listing
                 sqlx::query(
                     r#"
                     UPDATE marketplace_listings
@@ -555,14 +595,14 @@ impl MarketplaceService {
                 .execute(&mut *tx)
                 .await?;
 
-                // 转移所有权
+                // Transfer ownership
                 sqlx::query("UPDATE player_titans SET player_id = $1 WHERE id = $2")
                     .bind(bid.bidder_id)
                     .bind(listing.titan_id)
                     .execute(&mut *tx)
                     .await?;
 
-                // 创建交易记录
+                // Create transaction record
                 let transaction = sqlx::query_as::<_, MarketplaceTransaction>(
                     r#"
                     INSERT INTO marketplace_transactions
@@ -585,7 +625,7 @@ impl MarketplaceService {
                 Ok(Some(transaction))
             }
             None => {
-                // 无出价 - 标记为过期
+                // No bids - mark as expired
                 sqlx::query("UPDATE marketplace_listings SET status = 'expired' WHERE id = $1")
                     .bind(listing_id)
                     .execute(&mut *tx)
@@ -603,7 +643,7 @@ impl MarketplaceService {
 
     /// Make an offer on a Titan (not listed)
     pub async fn make_offer(&self, offerer_id: Uuid, req: MakeOfferRequest) -> ApiResult<PriceOffer> {
-        // 验证 Titan 存在且不属于出价者
+        // Verify Titan exists and not owned by offerer
         let owner_id: Option<Uuid> = sqlx::query_scalar(
             "SELECT player_id FROM player_titans WHERE id = $1"
         )
@@ -642,7 +682,7 @@ impl MarketplaceService {
     pub async fn accept_offer(&self, owner_id: Uuid, offer_id: Uuid) -> ApiResult<MarketplaceTransaction> {
         let mut tx = self.db.pg.begin().await?;
 
-        // 获取并验证 offer
+        // Get and validate offer
         let offer = sqlx::query_as::<_, PriceOffer>(
             "SELECT * FROM price_offers WHERE id = $1 AND owner_id = $2 AND status = 'pending' FOR UPDATE"
         )
@@ -661,27 +701,27 @@ impl MarketplaceService {
             return Err(AppError::BadRequest("Offer has expired".into()));
         }
 
-        // 计算费用
+        // Calculate fees
         let fee = (offer.amount * PLATFORM_FEE_BPS) / 10000;
         let seller_receives = offer.amount - fee;
 
-        // 更新 offer 状态
+        // Update offer status
         sqlx::query("UPDATE price_offers SET status = 'accepted', responded_at = NOW() WHERE id = $1")
             .bind(offer_id)
             .execute(&mut *tx)
             .await?;
 
-        // 转移所有权
+        // Transfer ownership
         sqlx::query("UPDATE player_titans SET player_id = $1 WHERE id = $2")
             .bind(offer.offerer_id)
             .bind(offer.titan_id)
             .execute(&mut *tx)
             .await?;
 
-        // 创建虚拟挂单（用于交易记录）
+        // Create virtual listing (for transaction record)
         let listing_id = Uuid::new_v4();
 
-        // 创建交易记录
+        // Create transaction record
         let transaction = sqlx::query_as::<_, MarketplaceTransaction>(
             r#"
             INSERT INTO marketplace_transactions
@@ -813,7 +853,7 @@ impl MarketplaceService {
 
     /// Get player's favorite listings
     pub async fn get_favorites(&self, player_id: Uuid) -> ApiResult<Vec<ListingResponse>> {
-        // 简化版本，复用 search_listings 的返回格式
+        // Simplified version, reuse search_listings response format
         let rows = sqlx::query(
             r#"
             SELECT 

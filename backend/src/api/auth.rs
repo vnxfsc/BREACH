@@ -7,9 +7,10 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{ApiResult, AppError};
+use crate::middleware::auth::AuthPlayer;
 use crate::services::auth::{AuthChallenge, AuthRequest, AuthResponse};
 use crate::AppState;
 
@@ -65,13 +66,27 @@ async fn authenticate(
     }))
 }
 
+/// Token refresh response
+#[derive(Debug, Serialize)]
+pub struct RefreshResponse {
+    pub token: String,
+    pub expires_at: i64,
+}
+
 /// Refresh token (requires valid token in header)
 async fn refresh_token(
-    State(_state): State<Arc<AppState>>,
-    // Would need to extract from header
-) -> ApiResult<Json<AuthResponse>> {
-    // TODO: Implement token refresh
-    Err(AppError::BadRequest("Token refresh not implemented yet".into()))
+    State(state): State<Arc<AppState>>,
+    AuthPlayer(session): AuthPlayer,
+) -> ApiResult<Json<RefreshResponse>> {
+    // Generate new token with extended expiry
+    let token = state
+        .services
+        .auth
+        .generate_token(session.player_id, &session.wallet_address)?;
+
+    let expires_at = chrono::Utc::now().timestamp() + (state.config.auth.jwt_expiry_hours as i64 * 3600);
+
+    Ok(Json(RefreshResponse { token, expires_at }))
 }
 
 pub fn routes(state: Arc<AppState>) -> Router {
