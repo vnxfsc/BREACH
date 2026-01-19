@@ -16,6 +16,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.1] - 2026-01-20
+
+### Fixed - Code Quality & TODO Completion
+
+#### Token Refresh (`api/auth.rs`)
+- **Implemented** token refresh endpoint that was previously returning "not implemented"
+- Uses `AuthPlayer` extractor to validate existing token
+- Returns new JWT with extended expiry
+
+#### Chat WebSocket Broadcast (`api/chat.rs`, `websocket/mod.rs`)
+- **Implemented** real-time WebSocket broadcasting for chat messages
+- Added `ChatMessage`, `ChatMessageEdited`, `ChatMessageDeleted` WebSocket event types
+- Extended `Broadcaster` with chat-specific methods:
+  - `subscribe_chat_channel()` - Subscribe player to channel
+  - `unsubscribe_chat_channel()` - Unsubscribe from channel
+  - `broadcast_chat_message()` - Broadcast to channel subscribers
+  - `broadcast_to_player()` - Direct message to specific player
+  - `is_player_online()` - Check player online status
+
+#### Redis Online Status (`services/chat.rs`)
+- **Implemented** Redis-based player online status tracking
+- Added methods: `set_player_online()`, `is_player_online()`, `refresh_online_status()`, `set_player_offline()`
+- Online status TTL: 5 minutes (auto-expire)
+- Private chat now shows accurate online status for participants
+
+#### Marketplace SQL Query (`services/marketplace.rs`)
+- **Fixed** dynamic SQL query parameter binding
+- Proper tracking of parameter indices ($2, $3, etc.)
+- Only binds parameters that are actually used in query
+- Prevents SQL errors with optional filter parameters
+
+#### Data Model Fix (`models/marketplace.rs`)
+- **Fixed** `TitanListingInfo.genes` type from `Option<serde_json::Value>` to `Vec<u8>`
+- Matches database `BYTEA` column type
+
+### Technical Details
+- All TODO comments removed from codebase
+- 0 compilation errors, 34 warnings (unused code)
+- Full test coverage for all fixed endpoints
+
+---
+
 ## [0.7.0] - 2026-01-20
 
 ### Added - Marketplace & Chat Systems

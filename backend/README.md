@@ -290,13 +290,24 @@ cargo clippy
 
 | Endpoint | Description |
 |----------|-------------|
-| `/ws?geohash=xxx` | Real-time updates |
+| `/ws?geohash=xxx&token=jwt` | Real-time updates (token optional for auth) |
 
-**WebSocket Events:**
-- `TitanSpawn` - New Titan spawned
-- `TitanCaptured` - Titan captured
+**WebSocket Events (Map):**
+- `TitanSpawn` - New Titan spawned in subscribed region
+- `TitanCaptured` - Titan captured by another player
 - `TitanExpired` - Titan despawned
-- `Subscribe` / `Unsubscribe` - Region subscription
+- `PlayerNearby` / `PlayerLeft` - Nearby player updates
+- `Subscribe` / `Unsubscribe` - Region subscription confirmation
+
+**WebSocket Events (Chat):**
+- `ChatMessage` - New message in subscribed channel
+- `ChatMessageEdited` - Message edited
+- `ChatMessageDeleted` - Message deleted
+
+**WebSocket Events (System):**
+- `Welcome` - Connection established with connection_id
+- `Pong` - Heartbeat response with server_time
+- `Error` - Error with code and message
 
 ## Configuration
 
@@ -307,7 +318,7 @@ Configuration is loaded from (in order):
 
 ## Database Schema
 
-See `migrations/` for the full schema. 36 tables including:
+See `migrations/` for the full schema. 45+ tables including:
 
 **Core Tables:**
 - `players` - Player accounts and stats
