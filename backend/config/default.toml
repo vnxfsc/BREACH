@@ -1,0 +1,34 @@
+# BREACH Backend Default Configuration
+
+[server]
+host = "0.0.0.0"
+port = 8080
+env = "development"
+
+[database]
+url = "postgres://localhost/breach"
+max_connections = 10
+min_connections = 2
+
+[redis]
+url = "redis://localhost:6379"
+pool_size = 10
+
+[solana]
+rpc_url = "https://api.devnet.solana.com"
+ws_url = "wss://api.devnet.solana.com"
+titan_program_id = "3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7"
+game_program_id = "DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX"
+breach_token_mint = "CSH2Vz4MbgTLzB9SYJ7gBwNsyu7nKpbvEJzKQLgmmjt4"
+backend_keypair_path = "~/.config/solana/backend-keypair.json"
+
+[auth]
+jwt_secret = "development-secret-change-in-production"
+jwt_expiry_hours = 24
+signature_expiry_seconds = 300
+
+[game]
+capture_radius_meters = 50.0
+capture_cooldown_seconds = 300
+max_speed_mps = 42.0
+location_accuracy_threshold = 100.0

@@ -11,8 +11,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - Mobile app development (Flutter)
-- Backend API implementation
 - AR capture system integration
+- Mainnet deployment
+
+---
+
+## [0.5.0] - 2026-01-20
+
+### Added
+- **Backend API** - Rust Axum high-performance backend
+  - Authentication (wallet signature + JWT)
+  - Map API (nearby Titans, POIs)
+  - Capture authorization service
+  - Location verification & anti-spoofing
+  - Player management & leaderboard
+  - WebSocket real-time updates
+  - PostgreSQL + PostGIS database schema
+  - Redis caching layer
+  - Full configuration system
+
+### Technical
+- 20+ Rust source files
+- Database migrations
+- Environment configuration
+- API documentation
 
 ---
 
