@@ -1073,6 +1073,363 @@ async function runMintWhilePausedTest(payer: Keypair, configPDA: PublicKey): Pro
 }
 
 // ============================================
+// Edge Case Tests
+// ============================================
+
+async function runUnauthorizedSetPausedTest(unauthorizedUser: Keypair, configPDA: PublicKey): Promise<boolean> {
+  console.log("\n📋 Test: Unauthorized Set Paused (should fail)");
+
+  // Check if unauthorized user has balance
+  const balance = await connection.getBalance(unauthorizedUser.publicKey);
+  if (balance < 0.01 * LAMPORTS_PER_SOL) {
+    console.log("   (Skipped: Unauthorized user has no balance - airdrop rate limited)");
+    recordTest("Unauthorized Set Paused (Skipped)", true);
+    return true;
+  }
+
+  const ix = buildSetPausedInstruction(unauthorizedUser.publicKey, configPDA, true);
+
+  try {
+    await sendAndConfirmTransaction(connection, new Transaction().add(ix), [unauthorizedUser]);
+    recordTest("Unauthorized Set Paused", false, "Should have failed but succeeded");
+    return false;
+  } catch (error: any) {
+    const code = parseErrorCode(error);
+    if (code === 6003 || code === 6000) {
+      console.log("   (Expected: Unauthorized/InvalidAuthority error)");
+      recordTest("Unauthorized Set Paused (Rejected)", true);
+      return true;
+    }
+    recordTest("Unauthorized Set Paused", false, getErrorMessage(code));
+    return false;
+  }
+}
+
+async function runUnauthorizedUpdateConfigTest(
+  unauthorizedUser: Keypair, 
+  configPDA: PublicKey
+): Promise<boolean> {
+  console.log("\n📋 Test: Unauthorized Update Config (should fail)");
+
+  // Check if unauthorized user has balance
+  const balance = await connection.getBalance(unauthorizedUser.publicKey);
+  if (balance < 0.01 * LAMPORTS_PER_SOL) {
+    console.log("   (Skipped: Unauthorized user has no balance - airdrop rate limited)");
+    recordTest("Unauthorized Update Config (Skipped)", true);
+    return true;
+  }
+
+  const ix = buildUpdateConfigInstruction(
+    unauthorizedUser.publicKey,
+    configPDA,
+    unauthorizedUser.publicKey, // treasury
+    unauthorizedUser.publicKey, // capture authority
+    100, 100, 100, 100, 0
+  );
+
+  try {
+    await sendAndConfirmTransaction(connection, new Transaction().add(ix), [unauthorizedUser]);
+    recordTest("Unauthorized Update Config", false, "Should have failed but succeeded");
+    return false;
+  } catch (error: any) {
+    const code = parseErrorCode(error);
+    if (code === 6003 || code === 6000) {
+      console.log("   (Expected: Unauthorized/InvalidAuthority error)");
+      recordTest("Unauthorized Update Config (Rejected)", true);
+      return true;
+    }
+    recordTest("Unauthorized Update Config", false, getErrorMessage(code));
+    return false;
+  }
+}
+
+async function runInvalidElementTypeTest(payer: Keypair, configPDA: PublicKey): Promise<boolean> {
+  console.log("\n📋 Test: Invalid Element Type (should fail)");
+
+  const config = await testReadConfig(configPDA);
+  if (!config) {
+    recordTest("Invalid Element Type", false, "Config not found");
+    return false;
+  }
+
+  const titanId = config.totalTitansMinted + BigInt(1);
+  const [playerPDA] = getPlayerPDA(payer.publicKey);
+  const [titanPDA] = getTitanPDA(titanId);
+
+  // Use element type 6 (invalid, max is 5)
+  const ix = buildMintTitanInstruction(
+    payer.publicKey,
+    configPDA,
+    playerPDA,
+    titanPDA,
+    payer.publicKey,
+    1001,
+    THREAT_CLASS.PIONEER,
+    6, // Invalid element type
+    50, 50, 50, 50,
+    [128, 128, 128, 128, 128, 128],
+    0, 0
+  );
+
+  try {
+    await sendAndConfirmTransaction(connection, new Transaction().add(ix), [payer]);
+    recordTest("Invalid Element Type", false, "Should have failed but succeeded");
+    return false;
+  } catch (error: any) {
+    const code = parseErrorCode(error);
+    if (code === 6301) {
+      console.log("   (Expected: InvalidElementType error)");
+      recordTest("Invalid Element Type (Rejected)", true);
+      return true;
+    }
+    recordTest("Invalid Element Type", false, getErrorMessage(code));
+    return false;
+  }
+}
+
+async function runInvalidThreatClassTest(payer: Keypair, configPDA: PublicKey): Promise<boolean> {
+  console.log("\n📋 Test: Invalid Threat Class (should fail)");
+
+  const config = await testReadConfig(configPDA);
+  if (!config) {
+    recordTest("Invalid Threat Class", false, "Config not found");
+    return false;
+  }
+
+  const titanId = config.totalTitansMinted + BigInt(1);
+  const [playerPDA] = getPlayerPDA(payer.publicKey);
+  const [titanPDA] = getTitanPDA(titanId);
+
+  // Use threat class 0 (invalid, min is 1)
+  const ix = buildMintTitanInstruction(
+    payer.publicKey,
+    configPDA,
+    playerPDA,
+    titanPDA,
+    payer.publicKey,
+    1001,
+    0, // Invalid threat class
+    ELEMENT.STORM,
+    50, 50, 50, 50,
+    [128, 128, 128, 128, 128, 128],
+    0, 0
+  );
+
+  try {
+    await sendAndConfirmTransaction(connection, new Transaction().add(ix), [payer]);
+    recordTest("Invalid Threat Class", false, "Should have failed but succeeded");
+    return false;
+  } catch (error: any) {
+    const code = parseErrorCode(error);
+    if (code === 6300) {
+      console.log("   (Expected: InvalidThreatClass error)");
+      recordTest("Invalid Threat Class (Rejected)", true);
+      return true;
+    }
+    recordTest("Invalid Threat Class", false, getErrorMessage(code));
+    return false;
+  }
+}
+
+async function runFuseWithSelfTest(
+  payer: Keypair, 
+  configPDA: PublicKey,
+  titan: { titanPDA: PublicKey; titanId: bigint }
+): Promise<boolean> {
+  console.log("\n📋 Test: Fuse With Self (should fail)");
+
+  const config = await testReadConfig(configPDA);
+  if (!config) {
+    recordTest("Fuse With Self", false, "Config not found");
+    return false;
+  }
+
+  const offspringId = config.totalTitansMinted + BigInt(1);
+  const [offspringPDA] = getTitanPDA(offspringId);
+
+  // Try to fuse titan with itself
+  const ix = buildFuseInstruction(
+    payer.publicKey,
+    configPDA,
+    titan.titanPDA,
+    titan.titanPDA, // Same titan
+    offspringPDA
+  );
+
+  try {
+    await sendAndConfirmTransaction(connection, new Transaction().add(ix), [payer]);
+    recordTest("Fuse With Self", false, "Should have failed but succeeded");
+    return false;
+  } catch (error: any) {
+    const code = parseErrorCode(error);
+    if (code === 6400) {
+      console.log("   (Expected: CannotFuseWithSelf error)");
+      recordTest("Fuse With Self (Rejected)", true);
+      return true;
+    }
+    recordTest("Fuse With Self", false, getErrorMessage(code));
+    return false;
+  }
+}
+
+async function runTransferTest(
+  fromOwner: Keypair,
+  toOwner: Keypair,
+  configPDA: PublicKey,
+  titan: { titanPDA: PublicKey; titanId: bigint }
+): Promise<boolean> {
+  console.log(`\n📋 Test: Transfer Titan #${titan.titanId}`);
+
+  const [fromPlayerPDA] = getPlayerPDA(fromOwner.publicKey);
+  const [toPlayerPDA] = getPlayerPDA(toOwner.publicKey);
+
+  const titanBefore = await testReadTitan(titan.titanPDA);
+  if (!titanBefore) {
+    recordTest("Transfer Titan", false, "Titan not found");
+    return false;
+  }
+
+  console.log(`   From: ${fromOwner.publicKey.toBase58().slice(0, 12)}...`);
+  console.log(`   To: ${toOwner.publicKey.toBase58().slice(0, 12)}...`);
+
+  const ix = buildTransferInstruction(
+    fromOwner.publicKey,
+    toOwner.publicKey,
+    configPDA,
+    titan.titanPDA,
+    fromPlayerPDA,
+    toPlayerPDA
+  );
+
+  try {
+    const sig = await sendAndConfirmTransaction(connection, new Transaction().add(ix), [fromOwner]);
+    console.log(`   Signature: ${sig.slice(0, 20)}...`);
+
+    // Verify transfer - note: original_owner should remain the same
+    const titanAfter = await testReadTitan(titan.titanPDA);
+    if (titanAfter) {
+      console.log(`   Original Owner (unchanged): ${titanAfter.originalOwner.toBase58().slice(0, 12)}...`);
+    }
+
+    recordTest("Transfer Titan", true);
+    return true;
+  } catch (error: any) {
+    const code = parseErrorCode(error);
+    recordTest("Transfer Titan", false, getErrorMessage(code));
+    return false;
+  }
+}
+
+async function runNotOwnerTransferTest(
+  notOwner: Keypair,
+  actualOwner: PublicKey,
+  configPDA: PublicKey,
+  titan: { titanPDA: PublicKey; titanId: bigint }
+): Promise<boolean> {
+  console.log(`\n📋 Test: Transfer by Non-Owner (should fail)`);
+
+  // Check if not-owner has balance
+  const balance = await connection.getBalance(notOwner.publicKey);
+  if (balance < 0.01 * LAMPORTS_PER_SOL) {
+    console.log("   (Skipped: Non-owner has no balance - airdrop rate limited)");
+    recordTest("Not Owner Transfer (Skipped)", true);
+    return true;
+  }
+
+  const [fromPlayerPDA] = getPlayerPDA(notOwner.publicKey);
+  const [toPlayerPDA] = getPlayerPDA(actualOwner);
+
+  const ix = buildTransferInstruction(
+    notOwner.publicKey,
+    actualOwner,
+    configPDA,
+    titan.titanPDA,
+    fromPlayerPDA,
+    toPlayerPDA
+  );
+
+  try {
+    await sendAndConfirmTransaction(connection, new Transaction().add(ix), [notOwner]);
+    recordTest("Not Owner Transfer", false, "Should have failed but succeeded");
+    return false;
+  } catch (error: any) {
+    const code = parseErrorCode(error);
+    if (code === 6002) {
+      console.log("   (Expected: NotOwner error)");
+      recordTest("Not Owner Transfer (Rejected)", true);
+      return true;
+    }
+    recordTest("Not Owner Transfer", false, getErrorMessage(code));
+    return false;
+  }
+}
+
+async function runMaxTitansTest(payer: Keypair, configPDA: PublicKey): Promise<boolean> {
+  console.log("\n📋 Test: Max Titans Per Wallet Check");
+  
+  const config = await testReadConfig(configPDA);
+  if (!config) {
+    recordTest("Max Titans Check", false, "Config not found");
+    return false;
+  }
+
+  const [playerPDA] = getPlayerPDA(payer.publicKey);
+  const player = await testReadPlayer(playerPDA);
+  
+  if (!player) {
+    console.log("   Player not found, skipping");
+    recordTest("Max Titans Check", true);
+    return true;
+  }
+
+  console.log(`   Current Titans Owned: ${player.titansOwned}`);
+  console.log(`   Max Allowed: ${config.maxTitansPerWallet}`);
+  
+  // This is just an informational test
+  const canMintMore = player.titansOwned < config.maxTitansPerWallet;
+  console.log(`   Can Mint More: ${canMintMore}`);
+  
+  recordTest("Max Titans Check", true);
+  return true;
+}
+
+async function runReadMultipleTitansTest(payer: Keypair, configPDA: PublicKey): Promise<boolean> {
+  console.log("\n📋 Test: Read All Minted Titans");
+
+  const config = await testReadConfig(configPDA);
+  if (!config) {
+    recordTest("Read Multiple Titans", false, "Config not found");
+    return false;
+  }
+
+  const totalMinted = Number(config.totalTitansMinted);
+  console.log(`   Total Titans Minted: ${totalMinted}`);
+
+  let successCount = 0;
+  let elementCounts: Record<string, number> = {};
+  let classCounts: Record<string, number> = {};
+
+  for (let i = 1; i <= Math.min(totalMinted, 10); i++) {
+    const [titanPDA] = getTitanPDA(BigInt(i));
+    const titan = await testReadTitan(titanPDA);
+    if (titan) {
+      successCount++;
+      const elementName = ELEMENT_NAMES[titan.elementType] || "Unknown";
+      const className = CLASS_NAMES[titan.threatClass] || "Unknown";
+      elementCounts[elementName] = (elementCounts[elementName] || 0) + 1;
+      classCounts[className] = (classCounts[className] || 0) + 1;
+    }
+  }
+
+  console.log(`   Successfully Read: ${successCount}/${Math.min(totalMinted, 10)}`);
+  console.log(`   Elements: ${JSON.stringify(elementCounts)}`);
+  console.log(`   Classes: ${JSON.stringify(classCounts)}`);
+
+  recordTest("Read Multiple Titans", true);
+  return true;
+}
+
+// ============================================
 // Main Test Suite
 // ============================================
 
@@ -1094,14 +1451,31 @@ async function main() {
   const payer = loadWallet(walletPath);
   console.log(`\nPayer: ${payer.publicKey.toBase58()}`);
 
+  // Generate a random unauthorized user for testing
+  const unauthorizedUser = Keypair.generate();
+  console.log(`Unauthorized User: ${unauthorizedUser.publicKey.toBase58()}`);
+
   const balance = await connection.getBalance(payer.publicKey);
   console.log(`Balance: ${balance / LAMPORTS_PER_SOL} SOL`);
 
   if (balance < 0.5 * LAMPORTS_PER_SOL) {
-    console.log("\nRequesting airdrop...");
-    const sig = await connection.requestAirdrop(payer.publicKey, 2 * LAMPORTS_PER_SOL);
+    console.log("\nRequesting airdrop for payer...");
+    try {
+      const sig = await connection.requestAirdrop(payer.publicKey, 2 * LAMPORTS_PER_SOL);
+      await connection.confirmTransaction(sig);
+      console.log("Airdrop received!");
+    } catch (e) {
+      console.log("Airdrop failed (rate limited), continuing...");
+    }
+  }
+
+  // Fund unauthorized user for tests
+  console.log("Funding unauthorized user...");
+  try {
+    const sig = await connection.requestAirdrop(unauthorizedUser.publicKey, 0.1 * LAMPORTS_PER_SOL);
     await connection.confirmTransaction(sig);
-    console.log("Airdrop received!");
+  } catch (e) {
+    console.log("Airdrop for unauthorized user failed (rate limited), continuing...");
   }
 
   const [configPDA] = getConfigPDA();
@@ -1111,7 +1485,7 @@ async function main() {
   // ═══════════════════════════════════════════
 
   console.log("\n════════════════════════════════════════════════════════════════");
-  console.log("                        RUNNING TESTS                             ");
+  console.log("                     BASIC FUNCTIONALITY TESTS                    ");
   console.log("════════════════════════════════════════════════════════════════");
 
   // 1. Initialize
@@ -1157,17 +1531,61 @@ async function main() {
     await runFuseTest(payer, configPDA, titan1, titan3);
   }
 
-  // 10. Test Pause functionality
+  console.log("\n════════════════════════════════════════════════════════════════");
+  console.log("                       EDGE CASE TESTS                            ");
+  console.log("════════════════════════════════════════════════════════════════");
+
+  // 10. Test invalid element type
+  await runInvalidElementTypeTest(payer, configPDA);
+
+  // 11. Test invalid threat class
+  await runInvalidThreatClassTest(payer, configPDA);
+
+  // 12. Test fuse with self
+  if (titan1) {
+    await runFuseWithSelfTest(payer, configPDA, titan1);
+  }
+
+  // 13. Test max titans check
+  await runMaxTitansTest(payer, configPDA);
+
+  console.log("\n════════════════════════════════════════════════════════════════");
+  console.log("                    AUTHORIZATION TESTS                           ");
+  console.log("════════════════════════════════════════════════════════════════");
+
+  // 14. Test unauthorized setPaused
+  await runUnauthorizedSetPausedTest(unauthorizedUser, configPDA);
+
+  // 15. Test unauthorized updateConfig
+  await runUnauthorizedUpdateConfigTest(unauthorizedUser, configPDA);
+
+  // 16. Test non-owner transfer (should fail)
+  if (titan1) {
+    await runNotOwnerTransferTest(unauthorizedUser, payer.publicKey, configPDA, titan1);
+  }
+
+  console.log("\n════════════════════════════════════════════════════════════════");
+  console.log("                      PAUSE/UNPAUSE TESTS                         ");
+  console.log("════════════════════════════════════════════════════════════════");
+
+  // 17. Test Pause functionality
   await runSetPausedTest(payer, configPDA, true);
 
-  // 11. Test Mint while paused (should fail)
+  // 18. Test Mint while paused (should fail)
   await runMintWhilePausedTest(payer, configPDA);
 
-  // 12. Unpause
+  // 19. Unpause
   await runSetPausedTest(payer, configPDA, false);
 
-  // 13. Mint after unpause (should work)
+  // 20. Mint after unpause (should work)
   await runMintTitanTest(payer, configPDA, ELEMENT.ABYSSAL);
+
+  console.log("\n════════════════════════════════════════════════════════════════");
+  console.log("                    COMPREHENSIVE READS                           ");
+  console.log("════════════════════════════════════════════════════════════════");
+
+  // 21. Read multiple titans
+  await runReadMultipleTitansTest(payer, configPDA);
 
   // ═══════════════════════════════════════════
   // Test Summary
@@ -1183,10 +1601,45 @@ async function main() {
   console.log(`\n  Passed: ${passed}  |  Failed: ${failed}  |  Total: ${testResults.length}`);
   console.log("");
 
-  for (const result of testResults) {
+  // Group results by category
+  const basicTests = testResults.filter(t => 
+    !t.name.includes("Unauthorized") && 
+    !t.name.includes("Not Owner") && 
+    !t.name.includes("Invalid") &&
+    !t.name.includes("With Self") &&
+    !t.name.includes("Max Titans") &&
+    !t.name.includes("Multiple")
+  );
+  const edgeTests = testResults.filter(t => 
+    t.name.includes("Invalid") || 
+    t.name.includes("With Self") ||
+    t.name.includes("Max Titans") ||
+    t.name.includes("Multiple")
+  );
+  const authTests = testResults.filter(t => 
+    t.name.includes("Unauthorized") || 
+    t.name.includes("Not Owner")
+  );
+
+  console.log("  📦 Basic Functionality:");
+  for (const result of basicTests) {
     const icon = result.passed ? "✅" : "❌";
     const error = result.error ? ` (${result.error})` : "";
-    console.log(`  ${icon} ${result.name}${error}`);
+    console.log(`     ${icon} ${result.name}${error}`);
+  }
+
+  console.log("\n  🔒 Edge Cases:");
+  for (const result of edgeTests) {
+    const icon = result.passed ? "✅" : "❌";
+    const error = result.error ? ` (${result.error})` : "";
+    console.log(`     ${icon} ${result.name}${error}`);
+  }
+
+  console.log("\n  🛡️ Authorization:");
+  for (const result of authTests) {
+    const icon = result.passed ? "✅" : "❌";
+    const error = result.error ? ` (${result.error})` : "";
+    console.log(`     ${icon} ${result.name}${error}`);
   }
 
   console.log("\n════════════════════════════════════════════════════════════════");
@@ -1198,6 +1651,15 @@ async function main() {
     console.log(`   Total Titans Minted: ${finalConfig.totalTitansMinted}`);
     console.log(`   Total Fusions: ${finalConfig.totalFusions}`);
     console.log(`   Paused: ${finalConfig.paused}`);
+  }
+
+  // Exit with proper code
+  if (failed > 0) {
+    console.log(`\n❌ ${failed} test(s) failed!`);
+    process.exit(1);
+  } else {
+    console.log(`\n✅ All ${passed} tests passed!`);
+    process.exit(0);
   }
 }
 

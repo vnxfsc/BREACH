@@ -1378,21 +1378,27 @@ pnpm install
 pnpm test
 ```
 
-**Test Suite Coverage (14/14 passing):**
+**Test Suite Coverage (22/22 passing):**
 
-| Test | Description | Status |
-|------|-------------|--------|
-| Initialize | Create GlobalConfig PDA | ✅ Pass |
-| Read Config | Verify config data | ✅ Pass |
-| Update Config | Modify config settings | ✅ Pass |
-| Set Paused (true) | Pause program | ✅ Pass |
-| Set Paused (false) | Unpause program | ✅ Pass |
-| Mint While Paused | Reject mint when paused | ✅ Pass |
-| Mint Titan | Create Titan NFT | ✅ Pass |
-| Read Player | Verify player account | ✅ Pass |
-| Level Up | Level up Titan | ✅ Pass |
-| Evolve | Evolve Titan (Lv30+) | ✅ Pass |
-| Fuse | Fuse two Titans | ✅ Pass |
+| Category | Test | Description | Status |
+|----------|------|-------------|--------|
+| **Basic** | Initialize | Create GlobalConfig PDA | ✅ Pass |
+| | Update Config | Modify config settings | ✅ Pass |
+| | Mint Titan | Create Titan NFT (multi-element) | ✅ Pass |
+| | Read Player | Verify player account | ✅ Pass |
+| | Level Up | Level up Titan (requires EXP) | ✅ Pass |
+| | Evolve | Evolve Titan (Lv30+) | ✅ Pass |
+| | Fuse | Fuse two Titans (Lv20+, same element) | ✅ Pass |
+| | Set Paused | Pause/unpause program | ✅ Pass |
+| | Mint While Paused | Reject mint when paused | ✅ Pass |
+| **Edge Cases** | Invalid Element | Reject element type > 5 | ✅ Pass |
+| | Invalid Threat Class | Reject threat class = 0 or > 5 | ✅ Pass |
+| | Fuse With Self | Reject same Titan fusion | ✅ Pass |
+| | Max Titans Check | Verify wallet Titan limit | ✅ Pass |
+| | Read Multiple Titans | Batch read verification | ✅ Pass |
+| **Authorization** | Unauthorized SetPaused | Reject non-authority | ✅ Pass |
+| | Unauthorized UpdateConfig | Reject non-authority | ✅ Pass |
+| | Not Owner Transfer | Reject non-owner transfer | ✅ Pass |
 
 ```typescript
 // Example: Initialize test

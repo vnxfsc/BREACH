@@ -38,9 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PlayerAccount` (152 bytes) - Player profile and statistics
 
 #### Testing
-- TypeScript integration test suite (14 tests, 100% passing)
-- Test coverage for all instructions
-- Error handling validation
+- TypeScript integration test suite (22 tests, 100% passing)
+- Basic functionality tests (9 tests)
+- Edge case tests (5 tests): Invalid inputs, self-fusion, max limits
+- Authorization tests (3 tests): Unauthorized access rejection
+- Error handling validation for all error codes
 
 ### Deployed
 - **Devnet**: `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7`

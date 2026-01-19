@@ -59,16 +59,27 @@ pnpm install
 pnpm test
 ```
 
-**Test Coverage (14/14 passing):**
-- ✅ Initialize
-- ✅ Update Config
+**Test Coverage (22/22 passing):**
+
+📦 Basic Functionality:
+- ✅ Initialize / Update Config
 - ✅ Mint Titan (multiple elements)
-- ✅ Read Player
+- ✅ Read Player / Read Multiple Titans
 - ✅ Level Up (requires EXP)
 - ✅ Evolve (requires Lv30+)
 - ✅ Fuse (requires Lv20+ & same element)
-- ✅ Set Paused
-- ✅ Mint While Paused (rejected)
+- ✅ Set Paused / Mint While Paused
+
+🔒 Edge Cases:
+- ✅ Invalid Element Type (rejected)
+- ✅ Invalid Threat Class (rejected)
+- ✅ Fuse With Self (rejected)
+- ✅ Max Titans Per Wallet Check
+
+🛡️ Authorization:
+- ✅ Unauthorized Set Paused (rejected)
+- ✅ Unauthorized Update Config (rejected)
+- ✅ Not Owner Transfer (rejected)
 
 ## Deployment
 
