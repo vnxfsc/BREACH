@@ -61,6 +61,9 @@ pub fn process_instruction(
         // Pause/unpause program (admin only)
         7 => instructions::set_paused::process(program_id, accounts, data),
         
+        // Add experience (CPI from Game Logic)
+        8 => instructions::add_experience::process(program_id, accounts, data),
+        
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }

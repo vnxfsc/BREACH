@@ -31,7 +31,7 @@ High-performance Rust backend for the BREACH Titan Hunter game.
 backend/
 ├── src/
 │   ├── main.rs              # Entry point + server setup
-│   ├── api/                  # HTTP endpoints (19 modules)
+│   ├── api/                  # HTTP endpoints (20 modules)
 │   │   ├── auth.rs          # Authentication
 │   │   ├── capture.rs       # Capture authorization
 │   │   ├── map.rs           # Map/Titan queries
@@ -47,13 +47,15 @@ backend/
 │   │   ├── leaderboard.rs   # Rankings
 │   │   ├── marketplace.rs   # NFT marketplace
 │   │   ├── chat.rs          # Chat system
+│   │   ├── solana.rs        # Solana on-chain queries
 │   │   └── health.rs        # Health checks
 │   ├── config/              # Configuration
 │   ├── db/                  # Database connections
 │   ├── error/               # Error handling
 │   ├── middleware/          # Auth middleware
 │   ├── models/              # Data models (15 modules)
-│   ├── services/            # Business logic (19 modules)
+│   ├── services/            # Business logic (20 modules)
+│   │   └── solana.rs        # Solana RPC client & tx builder
 │   ├── scheduler/           # Background tasks
 │   ├── utils/               # Helpers (geo, etc.)
 │   └── websocket/           # Real-time updates
@@ -323,6 +325,14 @@ Key areas covered:
 | GET | `/api/v1/chat/blocked` | Get blocked users |
 | POST | `/api/v1/chat/blocked` | Block user |
 | DELETE | `/api/v1/chat/blocked/:id` | Unblock user |
+
+### Solana (On-Chain)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/solana/backend-info` | Get backend wallet & program IDs |
+| GET | `/api/v1/solana/balance/:address` | Get SOL balance |
+| GET | `/api/v1/solana/breach-balance/:address` | Get $BREACH token balance |
 
 ### WebSocket
 

@@ -16,6 +16,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.3] - 2026-01-20
+
+### Fixed - Smart Contract Security
+
+#### Titan Transfer Ownership Validation (`titan_nft`)
+- **Security Fix**: Added `owner` field to `TitanData` struct to track current owner
+- **Fixed**: Transfer instruction now validates that signer is the actual owner of the Titan
+- **Updated**: `TitanData` account size increased from 118 to 150 bytes (added 32-byte Pubkey)
+- Mint instruction now initializes `owner` field to the initial capturer
+
+#### Files Changed
+- `contracts/programs/titan_nft/src/state/titan.rs` - Added `owner: Pubkey` field
+- `contracts/programs/titan_nft/src/instructions/transfer.rs` - Added ownership verification
+- `contracts/programs/titan_nft/src/instructions/mint_titan.rs` - Initialize owner on mint
+- `contracts/tests/test-titan.ts` - Updated `TITAN_DATA_SIZE` constant
+
+### Added - Backend Solana Integration
+
+#### Solana Service (`backend/src/services/solana.rs`)
+- **New**: Complete Solana RPC client service for on-chain interactions
+- Backend keypair loading from JSON file
+- SOL and BREACH token balance queries
+- Transaction building and signing utilities
+- Add experience instruction builder for titan_nft program
+- Record capture/battle instruction builders for game_logic program
+
+#### Solana API Endpoints (`backend/src/api/solana.rs`)
+- `GET /api/v1/solana/backend-info` - Backend wallet and program info
+- `GET /api/v1/solana/balance/:address` - SOL balance query
+- `GET /api/v1/solana/breach-balance/:address` - BREACH token balance query
+
+#### Battle & Capture Enhancements
+- `POST /api/v1/battle/complete-with-rewards` - Complete battle with on-chain rewards
+- `POST /api/v1/capture/confirm-with-rewards` - Confirm capture with on-chain recording
+- Added `SolanaError` variant to `AppError` enum
+
+### Deployed - Smart Contracts (Devnet)
+
+Both programs upgraded and tested on Solana Devnet:
+
+| Program | Address | Tests |
+|---------|---------|-------|
+| titan_nft | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | 22/22 ✅ |
+| game_logic | `DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX` | 15/15 ✅ |
+
+### Technical Details
+- **titan_nft tests**: Initialize, Mint, Level Up, Evolve, Fuse, Transfer, Pause/Unpause, Authorization
+- **game_logic tests**: Initialize, Record Capture, Record Battle, Add Experience, Pause/Unpause
+- **Total on-chain tests**: 37 passing
+
+---
+
 ## [0.7.2] - 2026-01-20
 
 ### Added - Unit Tests

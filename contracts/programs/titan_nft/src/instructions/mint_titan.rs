@@ -214,6 +214,7 @@ pub fn process(
     titan.link_strength = 10; // Initial link strength
     titan.captured_at = clock.unix_timestamp;
     titan.original_owner = *payer.key();
+    titan.owner = *payer.key();  // Current owner is the initial capturer
     titan.capture_location = encode_location(mint_data.capture_lat, mint_data.capture_lng);
     titan.generation = 0;
     titan.parent_a = 0;

@@ -30,15 +30,16 @@ Core NFT program for Titan management.
 | 2 | `level_up` | Level up a Titan |
 | 3 | `evolve` | Evolve a Titan |
 | 4 | `fuse` | Fuse two Titans |
-| 5 | `transfer` | Transfer Titan ownership |
+| 5 | `transfer` | Transfer Titan ownership (validates owner) |
 | 6 | `update_config` | Update program config (admin) |
 | 7 | `set_paused` | Pause/unpause program (admin) |
+| 8 | `add_experience` | Add EXP to Titan (backend only) |
 
 **Accounts:**
 | Account | Size | Description |
 |---------|------|-------------|
 | `GlobalConfig` | 182 bytes | Program configuration (packed) |
-| `TitanData` | 118 bytes | Titan NFT data (packed) |
+| `TitanData` | 150 bytes | Titan NFT data (packed, includes owner) |
 | `PlayerAccount` | 152 bytes | Player profile |
 
 ---
@@ -168,7 +169,7 @@ contracts/
 │   │       ├── error.rs        # Error definitions
 │   │       ├── state/          # Account structures
 │   │       │   ├── config.rs   # GlobalConfig (182 bytes)
-│   │       │   ├── titan.rs    # TitanData (118 bytes)
+│   │       │   ├── titan.rs    # TitanData (150 bytes, includes owner)
 │   │       │   └── player.rs   # PlayerAccount (152 bytes)
 │   │       ├── instructions/   # Instruction handlers
 │   │       └── utils/          # Gene calculations

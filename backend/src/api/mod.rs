@@ -16,6 +16,7 @@ mod notification;
 mod player;
 mod pvp;
 mod quest;
+mod solana;
 
 use std::sync::Arc;
 
@@ -54,4 +55,6 @@ fn api_routes(state: Arc<AppState>) -> Router {
         .merge(chat::routes(state.clone()))
         // PvP routes
         .merge(pvp::routes(state.clone()))
+        // Blockchain routes
+        .merge(solana::routes(state.clone()))
 }

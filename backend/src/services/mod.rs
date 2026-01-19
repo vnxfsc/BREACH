@@ -16,6 +16,7 @@ mod notification;
 mod player;
 mod pvp;
 mod quest;
+pub mod solana;
 mod spawn;
 
 pub use achievement::AchievementService;
@@ -34,6 +35,7 @@ pub use notification::NotificationService;
 pub use player::PlayerService;
 pub use pvp::PvpService;
 pub use quest::QuestService;
+pub use solana::SolanaService;
 pub use spawn::SpawnService;
 
 use crate::config::AppConfig;
@@ -58,11 +60,28 @@ pub struct Services {
     pub player: PlayerService,
     pub pvp: PvpService,
     pub quest: QuestService,
+    pub solana: Option<SolanaService>,
     pub spawn: SpawnService,
 }
 
 impl Services {
     pub fn new(config: &AppConfig, db: Database) -> Self {
+        // Try to create Solana service, log warning if it fails
+        let solana = match SolanaService::new(&config.solana) {
+            Ok(svc) => {
+                tracing::info!("✅ Solana service initialized");
+                Some(svc)
+            }
+            Err(e) => {
+                tracing::warn!("⚠️ Solana service not available: {}. Blockchain features disabled.", e);
+                // Fall back to service without keypair for basic RPC operations
+                match SolanaService::new_without_keypair(&config.solana) {
+                    Ok(svc) => Some(svc),
+                    Err(_) => None,
+                }
+            }
+        };
+
         Self {
             auth: AuthService::new(config.clone()),
             achievement: AchievementService::new(db.clone()),
@@ -80,6 +99,7 @@ impl Services {
             player: PlayerService::new(db.clone()),
             pvp: PvpService::new(db.clone()),
             quest: QuestService::new(db.clone()),
+            solana,
             spawn: SpawnService::new(config.clone(), db.clone()),
         }
     }

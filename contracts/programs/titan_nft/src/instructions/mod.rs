@@ -1,5 +1,6 @@
 //! Instruction handlers
 
+pub mod add_experience;
 pub mod evolve;
 pub mod fuse;
 pub mod initialize;
@@ -19,4 +20,5 @@ pub mod discriminator {
     pub const TRANSFER: u8 = 5;
     pub const UPDATE_CONFIG: u8 = 6;
     pub const SET_PAUSED: u8 = 7;
+    pub const ADD_EXPERIENCE: u8 = 8;
 }

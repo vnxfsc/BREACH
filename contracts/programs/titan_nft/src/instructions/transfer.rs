@@ -56,9 +56,17 @@ pub fn process(
     drop(to_player_data);
     drop(config_data);
 
-    // Load Titan - just verify it exists
-    let titan_data = titan_account.try_borrow_data()?;
-    let _titan = TitanData::from_account_data(&titan_data)?;
+    // Load Titan and verify ownership
+    let mut titan_data = titan_account.try_borrow_mut_data()?;
+    let titan = TitanData::from_account_data_mut(&mut titan_data)?;
+    
+    // Verify from_owner is the current owner of this Titan
+    if titan.owner.as_ref() != from_owner.key().as_ref() {
+        return Err(TitanError::NotOwner.into());
+    }
+    
+    // Update owner to new owner
+    titan.owner = *_to_owner.key();
     drop(titan_data);
 
     // Update from_player stats

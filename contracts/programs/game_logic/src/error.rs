@@ -100,6 +100,9 @@ pub enum GameError {
     
     /// CPI call failed
     CpiCallFailed = 7604,
+    
+    /// Invalid Titan NFT Program ID
+    InvalidTitanProgram = 7605,
 }
 
 impl From<GameError> for ProgramError {
@@ -139,6 +142,7 @@ impl GameError {
             Self::InvalidSeeds => "Invalid PDA seeds",
             Self::InvalidProgramId => "Invalid program ID",
             Self::CpiCallFailed => "CPI call failed",
+            Self::InvalidTitanProgram => "Invalid Titan NFT Program ID",
         }
     }
 }

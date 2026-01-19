@@ -69,6 +69,9 @@ pub enum AppError {
 
     #[error("Forbidden: {0}")]
     Forbidden(String),
+
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
 }
 
 impl IntoResponse for AppError {
@@ -141,6 +144,11 @@ impl IntoResponse for AppError {
             AppError::Internal(e) => {
                 tracing::error!("Internal error: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Internal server error".to_string())
+            }
+            
+            // 503 Service Unavailable
+            AppError::ServiceUnavailable(msg) => {
+                (StatusCode::SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE", msg.clone())
             }
         };
 

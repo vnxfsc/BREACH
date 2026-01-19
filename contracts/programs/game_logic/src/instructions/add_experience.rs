@@ -4,6 +4,7 @@
 
 use pinocchio::{
     account_info::AccountInfo,
+    cpi,
     program_error::ProgramError,
     pubkey::Pubkey,
     ProgramResult,
@@ -11,6 +12,12 @@ use pinocchio::{
 
 use crate::error::GameError;
 use crate::state::GameConfig;
+
+/// Titan NFT Program ID (deployed on Devnet)
+const TITAN_PROGRAM_ID: Pubkey = pinocchio_pubkey::pubkey!("3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7");
+
+/// Add experience instruction discriminator in Titan NFT Program
+const ADD_EXPERIENCE_DISCRIMINATOR: u8 = 8;
 
 /// Add experience instruction data
 #[repr(C, packed)]
@@ -22,6 +29,14 @@ pub struct AddExperienceData {
 }
 
 /// Process add experience instruction
+/// 
+/// Accounts:
+/// 0. `[signer]` Player (titan owner)
+/// 1. `[signer]` Backend authority
+/// 2. `[]` Game config PDA
+/// 3. `[writable]` Titan data PDA (from Titan NFT Program)
+/// 4. `[]` Titan NFT Global config PDA
+/// 5. `[]` Titan NFT Program
 pub fn process(
     _program_id: &Pubkey,
     accounts: &[AccountInfo],
@@ -29,11 +44,12 @@ pub fn process(
 ) -> ProgramResult {
     // Parse accounts
     let [
-        player,            // [0] Signer, titan owner
-        backend_authority, // [1] Signer, backend authority
-        config_account,    // [2] Config PDA
-        titan_account,     // [3] Titan PDA (from Titan NFT Program)
-        _titan_program,    // [4] Titan NFT Program
+        player,              // [0] Signer, titan owner
+        backend_authority,   // [1] Signer, backend authority
+        game_config_account, // [2] Game config PDA
+        titan_account,       // [3] Titan PDA (from Titan NFT Program)
+        titan_config,        // [4] Titan NFT Global config PDA
+        titan_program,       // [5] Titan NFT Program
     ] = accounts else {
         return Err(ProgramError::NotEnoughAccountKeys);
     };
@@ -43,8 +59,13 @@ pub fn process(
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    // Load config
-    let config_data = config_account.try_borrow_data()?;
+    // Verify Titan NFT Program ID
+    if titan_program.key() != &TITAN_PROGRAM_ID {
+        return Err(GameError::InvalidTitanProgram.into());
+    }
+
+    // Load game config
+    let config_data = game_config_account.try_borrow_data()?;
     let config = GameConfig::from_account_data(&config_data)?;
 
     // Check if paused
@@ -68,52 +89,48 @@ pub fn process(
         return Err(GameError::InvalidExperienceAmount.into());
     }
 
-    // Apply experience multiplier
+    // Apply experience multiplier from config
     let multiplied_exp = (exp_data.exp_amount as u64) * (config.exp_multiplier as u64) / 100;
     let final_exp = multiplied_exp.min(u32::MAX as u64) as u32;
 
-    // TODO: CPI to Titan NFT Program to update experience
-    // For now, we'll update the titan account directly if owned by this program
-    // In production, this would be a CPI call
-    
-    // Read titan data and update experience
-    let mut titan_data = titan_account.try_borrow_mut_data()?;
-    
-    // Verify discriminator (first 8 bytes should be "titan___")
-    if titan_data.len() < 118 {
-        return Err(GameError::InvalidAccountData.into());
-    }
-    
-    // Experience is at offset 8+8+2+1+1+1+1+1+1+6+1 = 31, and it's a u32
-    // Titan structure (packed):
-    // - discriminator: [u8; 8] (0-7)
-    // - titan_id: u64 (8-15)
-    // - species_id: u16 (16-17)
-    // - threat_class: u8 (18)
-    // - element_type: u8 (19)
-    // - power: u8 (20)
-    // - fortitude: u8 (21)
-    // - velocity: u8 (22)
-    // - resonance: u8 (23)
-    // - genes: [u8; 6] (24-29)
-    // - level: u8 (30)
-    // - experience: u32 (31-34)
-    
-    let exp_offset = 31;
-    let current_exp = u32::from_le_bytes([
-        titan_data[exp_offset],
-        titan_data[exp_offset + 1],
-        titan_data[exp_offset + 2],
-        titan_data[exp_offset + 3],
-    ]);
-    
-    // Add experience with overflow check
-    let new_exp = current_exp.saturating_add(final_exp);
-    titan_data[exp_offset..exp_offset + 4].copy_from_slice(&new_exp.to_le_bytes());
+    // Prepare CPI instruction data: [discriminator, exp_amount (u32)]
+    let mut cpi_data = Vec::with_capacity(5);
+    cpi_data.push(ADD_EXPERIENCE_DISCRIMINATOR);
+    cpi_data.extend_from_slice(&final_exp.to_le_bytes());
 
-    // Update config stats
+    // CPI to Titan NFT Program's add_experience instruction
+    // Account order for add_experience:
+    // 0. [signer] Backend authority
+    // 1. [] Global config PDA
+    // 2. [writable] Titan data PDA
+    cpi::invoke(
+        &pinocchio::instruction::Instruction {
+            program_id: &TITAN_PROGRAM_ID,
+            accounts: &[
+                pinocchio::instruction::AccountMeta {
+                    pubkey: backend_authority.key(),
+                    is_signer: true,
+                    is_writable: false,
+                },
+                pinocchio::instruction::AccountMeta {
+                    pubkey: titan_config.key(),
+                    is_signer: false,
+                    is_writable: false,
+                },
+                pinocchio::instruction::AccountMeta {
+                    pubkey: titan_account.key(),
+                    is_signer: false,
+                    is_writable: true,
+                },
+            ],
+            data: &cpi_data,
+        },
+        &[backend_authority, titan_config, titan_account],
+    )?;
+
+    // Update game config stats
     drop(config_data);
-    let mut config_data = config_account.try_borrow_mut_data()?;
+    let mut config_data = game_config_account.try_borrow_mut_data()?;
     let config = GameConfig::from_account_data_mut(&mut config_data)?;
     config.total_exp_distributed += final_exp as u64;
 

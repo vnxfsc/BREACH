@@ -60,6 +60,9 @@ pub struct TitanData {
     /// Original capturer address
     pub original_owner: Pubkey,
     
+    /// Current owner address
+    pub owner: Pubkey,
+    
     /// Capture location (encoded lat/lng)
     pub capture_location: u64,
     
@@ -77,8 +80,8 @@ pub struct TitanData {
 }
 
 impl TitanData {
-    /// Account size in bytes
-    pub const SIZE: usize = 118;
+    /// Account size in bytes (118 + 32 for owner field)
+    pub const SIZE: usize = 150;
     
     /// Account discriminator
     pub const DISCRIMINATOR: [u8; 8] = [0x54, 0x49, 0x54, 0x41, 0x4E, 0x44, 0x41, 0x54]; // "TITANDAT"

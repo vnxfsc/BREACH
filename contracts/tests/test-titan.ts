@@ -21,7 +21,7 @@ const PROGRAM_ID = new PublicKey("3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7")
 
 // Account sizes
 const GLOBAL_CONFIG_SIZE = 182;
-const TITAN_DATA_SIZE = 118;
+const TITAN_DATA_SIZE = 150;  // 118 + 32 bytes for owner field
 const PLAYER_ACCOUNT_SIZE = 152;
 
 // Instruction discriminators
