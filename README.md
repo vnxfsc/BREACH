@@ -132,10 +132,12 @@ breach/
 | Network | Program | Program ID | Status |
 |---------|---------|------------|--------|
 | **Devnet** | Titan NFT | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Live |
-| Devnet | Game Logic | TBD | 🔜 Planned |
+| **Devnet** | Game Logic | `DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX` | ✅ Live |
 | Mainnet | All | TBD | 🔜 Planned |
 
-**Explorer**: [View Titan NFT Program](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
+**Explorer**:
+- [Titan NFT Program](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
+- [Game Logic Program](https://explorer.solana.com/address/DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX?cluster=devnet)
 
 ---
 

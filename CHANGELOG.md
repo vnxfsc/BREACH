@@ -10,10 +10,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Game Logic Program development
 - Mobile app development (Flutter)
 - Backend API implementation
 - AR capture system integration
+
+---
+
+## [0.3.0] - 2026-01-20
+
+### Added
+
+#### Game Logic Program
+- **Deployed to Devnet**: `DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX`
+- `initialize` - Initialize game configuration
+- `record_capture` - Record Titan capture events with rewards
+- `record_battle` - Record battle results and experience gains
+- `add_experience` - Add experience to Titans
+- `distribute_reward` - Distribute $BREACH token rewards
+- `update_config` / `set_paused` - Admin controls
+
+#### Account Structures (Game Logic)
+- `GameConfig` (228 bytes) - Game configuration with reward settings
+- `BattleRecord` (122 bytes) - Battle history records
+- `CaptureRecord` (83 bytes) - Capture history records
+
+#### Testing
+- Game Logic integration test suite (15 tests, 100% passing)
+- Basic functionality: Initialize, Update Config, Record Capture/Battle
+- Edge cases: Expired Signature (rejected), Battle Self (rejected)
+- Authorization: Invalid Backend, Unauthorized Pause
+- **Total project tests: 37/37 passing** ✅
+
+### Technical Details
+- Framework: Pinocchio 0.8
+- Program Size: ~29KB
+- Interacts with Titan NFT Program via CPI
 
 ---
 
@@ -115,6 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.3.0 | 2026-01-20 | Game Logic Program deployed to Devnet |
 | 0.2.0 | 2026-01-20 | Titan NFT Program deployed to Devnet |
 | 0.1.0 | 2026-01-20 | Initial release with documentation and website |
 
@@ -149,10 +181,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [GitHub Repository](https://github.com/vnxfsc/BREACH)
 - [Live Website](https://breach-jade.vercel.app)
 - [Documentation](https://breach-jade.vercel.app/docs)
-- [Devnet Program](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
+- [Titan NFT Program (Devnet)](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
+- [Game Logic Program (Devnet)](https://explorer.solana.com/address/DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX?cluster=devnet)
 
 ---
 
-[Unreleased]: https://github.com/vnxfsc/BREACH/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/vnxfsc/BREACH/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/vnxfsc/BREACH/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vnxfsc/BREACH/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vnxfsc/BREACH/releases/tag/v0.1.0

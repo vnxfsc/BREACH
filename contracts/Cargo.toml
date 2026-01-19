@@ -2,6 +2,13 @@
 resolver = "2"
 members = ["programs/*"]
 
+[workspace.dependencies]
+pinocchio = "0.8"
+pinocchio-pubkey = "0.2"
+pinocchio-system = "0.2"
+pinocchio-token = "0.3"
+solana-program = "2.0"
+
 [profile.release]
 overflow-checks = true
 lto = "fat"
@@ -11,3 +18,4 @@ codegen-units = 1
 opt-level = 3
 incremental = false
 codegen-units = 1
+

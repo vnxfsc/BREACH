@@ -1,0 +1,18 @@
+[package]
+name = "game_logic"
+version = "0.1.0"
+edition = "2021"
+description = "BREACH Game Logic Program - Battle records, capture validation, rewards"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+pinocchio = "0.8.4"
+pinocchio-pubkey = "0.2.4"
+pinocchio-system = "0.2.3"
+pinocchio-token = "0.3.0"
+# Note: pinocchio provides solana-program types, no need for solana-program directly
+
+[features]
+no-entrypoint = []

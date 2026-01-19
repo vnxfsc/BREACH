@@ -4,12 +4,15 @@ Solana programs for the BREACH game, built with [Pinocchio](https://github.com/f
 
 ## 🚀 Deployment Status
 
-| Network | Program ID | Status |
-|---------|------------|--------|
-| **Devnet** | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Live |
-| Mainnet | TBD | 🔜 Planned |
+| Network | Program | Program ID | Status |
+|---------|---------|------------|--------|
+| **Devnet** | Titan NFT | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Live |
+| **Devnet** | Game Logic | `DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX` | ✅ Live |
+| Mainnet | All | TBD | 🔜 Planned |
 
-**Explorer**: [View on Solana Explorer](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
+**Explorer**:
+- [Titan NFT Program](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
+- [Game Logic Program](https://explorer.solana.com/address/DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX?cluster=devnet)
 
 ## Programs
 
@@ -36,6 +39,30 @@ Core NFT program for Titan management.
 | `TitanData` | 118 bytes | Titan NFT data (packed) |
 | `PlayerAccount` | 152 bytes | Player profile |
 
+---
+
+### Game Logic Program (`game_logic`)
+
+Battle records, capture validation, experience/rewards distribution.
+
+**Instructions:**
+| ID | Name | Description |
+|----|------|-------------|
+| 0 | `initialize` | Initialize game config |
+| 1 | `record_capture` | Record a Titan capture |
+| 2 | `record_battle` | Record a battle result |
+| 3 | `add_experience` | Add experience to a Titan |
+| 4 | `distribute_reward` | Distribute $BREACH rewards |
+| 5 | `update_config` | Update game config (admin) |
+| 6 | `set_paused` | Pause/unpause program (admin) |
+
+**Accounts:**
+| Account | Size | Description |
+|---------|------|-------------|
+| `GameConfig` | 228 bytes | Game configuration (packed) |
+| `BattleRecord` | 122 bytes | Battle record (packed) |
+| `CaptureRecord` | 83 bytes | Capture record (packed) |
+
 ## Building
 
 ```bash
@@ -59,7 +86,7 @@ pnpm install
 pnpm test
 ```
 
-**Test Coverage (22/22 passing):**
+### Titan NFT Tests (22/22 passing)
 
 📦 Basic Functionality:
 - ✅ Initialize / Update Config
@@ -80,6 +107,29 @@ pnpm test
 - ✅ Unauthorized Set Paused (rejected)
 - ✅ Unauthorized Update Config (rejected)
 - ✅ Not Owner Transfer (rejected)
+
+### Game Logic Tests (15/15 passing)
+
+📦 Basic Functionality:
+- ✅ Initialize
+- ✅ Update Backend Authority
+- ✅ Read Game Config
+- ✅ Record Capture (x3: different threat/element)
+- ✅ Record Battle (x2: different outcomes)
+
+🔒 Edge Cases:
+- ✅ Expired Capture Signature (rejected)
+- ✅ Battle Self (rejected)
+
+🛡️ Authorization & Pause:
+- ✅ Invalid Backend Authority (rejected)
+- ✅ Unauthorized Set Paused (rejected)
+- ✅ Set Paused True/False
+- ✅ Record While Paused (rejected)
+
+---
+
+**Total: 37/37 tests passing** ✅
 
 ## Deployment
 
@@ -109,33 +159,34 @@ contracts/
 ├── Cargo.toml              # Workspace config
 ├── README.md
 ├── programs/
-│   └── titan_nft/
+│   ├── titan_nft/          # Titan NFT Program
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs          # Entry point
+│   │       ├── error.rs        # Error definitions
+│   │       ├── state/          # Account structures
+│   │       │   ├── config.rs   # GlobalConfig (182 bytes)
+│   │       │   ├── titan.rs    # TitanData (118 bytes)
+│   │       │   └── player.rs   # PlayerAccount (152 bytes)
+│   │       ├── instructions/   # Instruction handlers
+│   │       └── utils/          # Gene calculations
+│   │
+│   └── game_logic/         # Game Logic Program
 │       ├── Cargo.toml
 │       └── src/
 │           ├── lib.rs          # Entry point
-│           ├── error.rs        # Error definitions (25+ error codes)
+│           ├── error.rs        # Error definitions
 │           ├── state/          # Account structures
-│           │   ├── mod.rs
-│           │   ├── config.rs   # GlobalConfig (182 bytes)
-│           │   ├── titan.rs    # TitanData (118 bytes)
-│           │   └── player.rs   # PlayerAccount (152 bytes)
-│           ├── instructions/   # Instruction handlers
-│           │   ├── mod.rs
-│           │   ├── initialize.rs
-│           │   ├── mint_titan.rs
-│           │   ├── level_up.rs
-│           │   ├── evolve.rs
-│           │   ├── fuse.rs
-│           │   ├── transfer.rs
-│           │   ├── update_config.rs
-│           │   └── set_paused.rs
-│           └── utils/          # Utilities
-│               ├── mod.rs
-│               └── genes.rs    # Gene calculations + tests
+│           │   ├── config.rs   # GameConfig (228 bytes)
+│           │   ├── battle.rs   # BattleRecord (122 bytes)
+│           │   └── capture.rs  # CaptureRecord (83 bytes)
+│           └── instructions/   # Instruction handlers
+│
 └── tests/
     ├── package.json
     ├── tsconfig.json
-    └── test-titan.ts           # Integration tests
+    ├── test-titan.ts           # Titan NFT tests (22)
+    └── test-game-logic.ts      # Game Logic tests (15)
 ```
 
 ## Dependencies
