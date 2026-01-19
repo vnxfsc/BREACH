@@ -4,10 +4,13 @@ mod achievement;
 mod auth;
 mod battle;
 mod capture;
+mod friend;
+mod guild;
 mod health;
 mod inventory;
 mod leaderboard;
 mod map;
+mod notification;
 mod player;
 mod quest;
 
@@ -39,4 +42,8 @@ fn api_routes(state: Arc<AppState>) -> Router {
         .merge(battle::routes(state.clone()))
         .merge(inventory::routes(state.clone()))
         .merge(leaderboard::routes(state.clone()))
+        // Social routes
+        .merge(friend::routes(state.clone()))
+        .merge(guild::routes(state.clone()))
+        .merge(notification::routes(state.clone()))
 }

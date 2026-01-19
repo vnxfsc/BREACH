@@ -8,6 +8,7 @@ mod location;
 mod player;
 mod poi;
 mod quest;
+mod social;
 mod titan;
 
 pub use achievement::*;
@@ -18,4 +19,5 @@ pub use location::*;
 pub use player::*;
 pub use poi::*;
 pub use quest::*;
+pub use social::*;
 pub use titan::*;
