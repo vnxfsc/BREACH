@@ -27,18 +27,14 @@ impl LeaderboardService {
         player_id: Option<Uuid>,
     ) -> ApiResult<LeaderboardResponse> {
         // Determine the sort column based on leaderboard type
-        let (order_column, score_column) = match lb_type {
-            LeaderboardType::Experience | LeaderboardType::WeeklyXp => ("experience", "experience"),
-            LeaderboardType::Captures | LeaderboardType::WeeklyCaptures => {
-                ("titans_captured", "titans_captured")
-            }
-            LeaderboardType::Battles | LeaderboardType::WeeklyBattles => {
-                ("battles_won", "battles_won")
-            }
-            LeaderboardType::Breach => ("breach_earned", "breach_earned"),
+        let order_column = match lb_type {
+            LeaderboardType::Experience | LeaderboardType::WeeklyXp => "experience",
+            LeaderboardType::Captures | LeaderboardType::WeeklyCaptures => "titans_captured",
+            LeaderboardType::Battles | LeaderboardType::WeeklyBattles => "battles_won",
+            LeaderboardType::Breach => "breach_earned",
         };
 
-        // Build query dynamically
+        // Build query dynamically (cast score to BIGINT for consistent type)
         let query = format!(
             r#"
             SELECT 
@@ -46,14 +42,14 @@ impl LeaderboardService {
                 id as player_id,
                 username,
                 wallet_address,
-                {} as score,
+                {}::BIGINT as score,
                 level
             FROM players
             WHERE is_banned = false
             ORDER BY {} DESC
             LIMIT $1 OFFSET $2
             "#,
-            order_column, score_column, order_column
+            order_column, order_column, order_column
         );
 
         let entries = sqlx::query_as::<_, LeaderboardResponseEntry>(&query)
@@ -79,13 +75,13 @@ impl LeaderboardService {
                     SELECT 
                         id,
                         ROW_NUMBER() OVER (ORDER BY {} DESC) as rank,
-                        {} as score
+                        {}::BIGINT as score
                     FROM players
                     WHERE is_banned = false
                 ) ranked
                 WHERE id = $1
                 "#,
-                order_column, score_column
+                order_column, order_column
             );
 
             let result: Option<(i64, i64)> = sqlx::query_as(&rank_query)
