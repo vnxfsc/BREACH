@@ -12,7 +12,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Mobile app development (Flutter)
 - AR capture system integration
+- Trading marketplace
+- Real-time chat system
 - Mainnet deployment
+
+---
+
+## [0.6.0] - 2026-01-20
+
+### Added
+- **PvP Matchmaking System** - Complete competitive multiplayer
+  - ELO rating system (starting 1000, K-factor 32)
+  - 7-tier rank system (Bronze → Champion) with 5 divisions each
+  - Real-time matchmaking queue with ELO-based opponent matching
+  - Auto-expansion of search range (±50 every 10 seconds)
+  - Turn-based combat (30s per turn)
+  - Action types: Attack, Special, Defend, Item
+  - Win/loss streak tracking
+  - Seasonal leaderboards and rewards
+  - PvP match history
+
+- **Social Features** - Complete social system
+  - Friend system (send/accept/reject requests)
+  - Friend list with online status
+  - Daily gift sending between friends
+  - Gift opening with rewards
+  - Friend removal
+
+- **Guild System** - Full guild management
+  - Guild creation with name, tag, description
+  - Role hierarchy (Member → Elder → Co-Leader → Leader)
+  - Join requests and approvals
+  - Member management (kick, promote, demote)
+  - Guild search and discovery
+  - Guild statistics and leaderboard
+
+- **Notification System** - In-game notifications
+  - 14 notification types (friend, guild, achievement, etc.)
+  - Read/unread status tracking
+  - Batch operations (mark all read, delete read)
+  - Unread count API
+
+- **Daily Quest System** - Daily challenges
+  - 13 quest templates across 7 types
+  - Auto-assignment of 4 daily quests
+  - Progress tracking
+  - Reward claiming (XP + BREACH tokens)
+
+- **Achievement System** - Player progression rewards
+  - 22 achievements across 6 categories
+  - Progress tracking with unlock detection
+  - Achievement summary by category
+  - Recent achievements feed
+
+- **Battle System** - Wild Titan battles
+  - Turn-based combat mechanics
+  - Damage calculation with RNG
+  - Battle history tracking
+  - XP and reward distribution
+
+- **Inventory System** - Titan collection management
+  - Player Titan listing with filters
+  - Titan details and statistics
+  - Favorite Titans feature
+  - Inventory summary (by element, threat class)
+
+- **Leaderboard System** - Multiple ranking types
+  - Experience, Captures, Battles, BREACH earned
+  - Weekly leaderboards
+  - Player rank lookup
+  - Top players by stat
+
+### Database
+- 4 new migration files
+- 15+ new database tables
+- Custom PostgreSQL types and functions
+- Optimized indexes for queries
+
+### API Endpoints
+- 30+ new API endpoints
+- All endpoints tested (100% pass rate)
+
+### Bug Fixes
+- Fixed route conflict (/leaderboard duplicate)
+- Fixed database port configuration
+- Fixed SQL type mismatch (INT4 vs INT8)
 
 ---
 
@@ -222,6 +306,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.6.0 | 2026-01-20 | PvP matchmaking, social features, guilds |
+| 0.5.0 | 2026-01-20 | Backend API with core features |
+| 0.4.0 | 2026-01-20 | Game economy & geographic system design |
+| 0.3.1 | 2026-01-20 | $BREACH Token created on Devnet |
 | 0.3.0 | 2026-01-20 | Game Logic Program deployed to Devnet |
 | 0.2.0 | 2026-01-20 | Titan NFT Program deployed to Devnet |
 | 0.1.0 | 2026-01-20 | Initial release with documentation and website |
@@ -230,20 +318,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Upcoming Releases
 
-### v0.3.0 (Planned)
-- Game Logic Program development
-- Battle system implementation
-- Experience/reward mechanics
+### v0.7.0 (Planned)
+- Trading marketplace
+- Real-time chat system
+- Enhanced WebSocket events
 
-### v0.4.0 (Planned)
-- Backend API development
-- Database schema implementation
-- Authentication system
-
-### v0.5.0 (Planned)
-- Mobile app MVP
+### v0.8.0 (Planned)
+- Mobile app MVP (Flutter)
 - AR capture prototype
-- Wallet integration
+- Push notifications
 
 ### v1.0.0 (Target)
 - Mainnet launch
@@ -262,7 +345,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/vnxfsc/BREACH/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/vnxfsc/BREACH/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/vnxfsc/BREACH/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/vnxfsc/BREACH/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/vnxfsc/BREACH/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/vnxfsc/BREACH/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/vnxfsc/BREACH/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vnxfsc/BREACH/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vnxfsc/BREACH/releases/tag/v0.1.0
