@@ -12,6 +12,7 @@ mod location;
 mod map;
 mod notification;
 mod player;
+mod pvp;
 mod quest;
 mod spawn;
 
@@ -27,6 +28,7 @@ pub use location::LocationService;
 pub use map::MapService;
 pub use notification::NotificationService;
 pub use player::PlayerService;
+pub use pvp::PvpService;
 pub use quest::QuestService;
 pub use spawn::SpawnService;
 
@@ -48,6 +50,7 @@ pub struct Services {
     pub map: MapService,
     pub notification: NotificationService,
     pub player: PlayerService,
+    pub pvp: PvpService,
     pub quest: QuestService,
     pub spawn: SpawnService,
 }
@@ -67,6 +70,7 @@ impl Services {
             map: MapService::new(db.clone()),
             notification: NotificationService::new(db.clone()),
             player: PlayerService::new(db.clone()),
+            pvp: PvpService::new(db.clone()),
             quest: QuestService::new(db.clone()),
             spawn: SpawnService::new(config.clone(), db.clone()),
         }

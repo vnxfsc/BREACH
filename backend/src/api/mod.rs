@@ -12,6 +12,7 @@ mod leaderboard;
 mod map;
 mod notification;
 mod player;
+mod pvp;
 mod quest;
 
 use std::sync::Arc;
@@ -46,4 +47,6 @@ fn api_routes(state: Arc<AppState>) -> Router {
         .merge(friend::routes(state.clone()))
         .merge(guild::routes(state.clone()))
         .merge(notification::routes(state.clone()))
+        // PvP routes
+        .merge(pvp::routes(state.clone()))
 }
