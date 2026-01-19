@@ -1,7 +1,7 @@
 //! Titan spawn service
 
 use chrono::{Datelike, Duration, Utc};
-use rand::{Rng, RngCore};
+use rand::Rng;
 use uuid::Uuid;
 
 use crate::config::AppConfig;

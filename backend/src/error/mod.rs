@@ -61,8 +61,14 @@ pub enum AppError {
     #[error("Internal server error")]
     Internal(#[from] anyhow::Error),
 
-    #[error("Not found")]
-    NotFound,
+    #[error("Not found: {0}")]
+    NotFound(String),
+
+    #[error("Bad request: {0}")]
+    BadRequest(String),
+
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
 }
 
 impl IntoResponse for AppError {
@@ -105,8 +111,14 @@ impl IntoResponse for AppError {
             AppError::PlayerNotFound => {
                 (StatusCode::NOT_FOUND, "PLAYER_NOT_FOUND", self.to_string())
             }
-            AppError::NotFound => {
-                (StatusCode::NOT_FOUND, "NOT_FOUND", self.to_string())
+            AppError::NotFound(msg) => {
+                (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone())
+            }
+            AppError::BadRequest(msg) => {
+                (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg.clone())
+            }
+            AppError::Forbidden(msg) => {
+                (StatusCode::FORBIDDEN, "FORBIDDEN", msg.clone())
             }
 
             // 409 Conflict

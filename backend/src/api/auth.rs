@@ -71,7 +71,7 @@ async fn refresh_token(
     // Would need to extract from header
 ) -> ApiResult<Json<AuthResponse>> {
     // TODO: Implement token refresh
-    Err(AppError::NotFound)
+    Err(AppError::BadRequest("Token refresh not implemented yet".into()))
 }
 
 pub fn routes(state: Arc<AppState>) -> Router {

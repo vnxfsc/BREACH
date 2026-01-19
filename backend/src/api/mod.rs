@@ -1,10 +1,15 @@
 //! API routes
 
+mod achievement;
 mod auth;
+mod battle;
 mod capture;
 mod health;
+mod inventory;
+mod leaderboard;
 mod map;
 mod player;
+mod quest;
 
 use std::sync::Arc;
 
@@ -23,8 +28,15 @@ pub fn routes(state: Arc<AppState>) -> Router {
 /// API v1 routes
 fn api_routes(state: Arc<AppState>) -> Router {
     Router::new()
+        // Core routes
         .merge(auth::routes(state.clone()))
         .merge(map::routes(state.clone()))
         .merge(capture::routes(state.clone()))
         .merge(player::routes(state.clone()))
+        // Feature routes
+        .merge(quest::routes(state.clone()))
+        .merge(achievement::routes(state.clone()))
+        .merge(battle::routes(state.clone()))
+        .merge(inventory::routes(state.clone()))
+        .merge(leaderboard::routes(state.clone()))
 }
