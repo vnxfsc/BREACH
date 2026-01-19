@@ -25,9 +25,10 @@ impl MapService {
         radius_meters: f64,
     ) -> ApiResult<Vec<TitanSpawnResponse>> {
         // Generate geohash prefix for efficient querying
+        // Use 5-char precision for broader coverage (~5km cells)
         let geohash = geohash::encode(
             geohash::Coord { x: lng, y: lat },
-            7, // 7-char precision ~150m
+            5, // 5-char precision ~5km
         )
         .unwrap_or_default();
 
@@ -45,39 +46,44 @@ impl MapService {
                 neighbors.nw,
             ]);
         }
+        
+        let patterns: Vec<String> = geohash_prefixes
+            .iter()
+            .map(|g| format!("{}%", g))
+            .collect();
+        
+        tracing::debug!("Searching titans: lat={}, lng={}, geohash={}, patterns={:?}", lat, lng, geohash, patterns);
 
-        // Query database
+        // Query database - use simple OR conditions for better compatibility
         let titans = sqlx::query_as::<_, TitanSpawn>(
             r#"
-            SELECT t.*, p.name as poi_name
+            SELECT t.id, t.poi_id, t.location_lat, t.location_lng, t.geohash,
+                   t.element, t.threat_class, t.species_id, t.genes,
+                   t.spawned_at, t.expires_at, t.captured_by, t.captured_at,
+                   t.capture_count, t.max_captures
             FROM titan_spawns t
-            LEFT JOIN pois p ON t.poi_id = p.id
-            WHERE t.geohash LIKE ANY($1)
-              AND t.expires_at > NOW()
+            WHERE t.expires_at > NOW()
               AND (t.captured_by IS NULL OR t.capture_count < t.max_captures)
               AND ST_DWithin(
                 ST_SetSRID(ST_MakePoint(t.location_lng, t.location_lat), 4326)::geography,
-                ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
-                $4
+                ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+                $3
               )
             ORDER BY ST_Distance(
                 ST_SetSRID(ST_MakePoint(t.location_lng, t.location_lat), 4326)::geography,
-                ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
+                ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
             )
             LIMIT 50
             "#,
-        )
-        .bind(
-            geohash_prefixes
-                .iter()
-                .map(|g| format!("{}%", &g[..5]))
-                .collect::<Vec<_>>(),
         )
         .bind(lng)
         .bind(lat)
         .bind(radius_meters)
         .fetch_all(&self.db.pg)
         .await?;
+
+        tracing::info!("Query returned {} titans for params: lng={}, lat={}, radius={}", 
+            titans.len(), lng, lat, radius_meters);
 
         // Convert to response format
         let responses: Vec<TitanSpawnResponse> = titans

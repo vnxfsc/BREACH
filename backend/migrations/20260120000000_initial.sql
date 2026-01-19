@@ -102,8 +102,8 @@ CREATE TABLE titan_spawns (
 CREATE INDEX idx_titan_spawns_location ON titan_spawns(location_lat, location_lng);
 CREATE INDEX idx_titan_spawns_geohash ON titan_spawns(geohash);
 CREATE INDEX idx_titan_spawns_expires ON titan_spawns(expires_at) WHERE captured_by IS NULL;
-CREATE INDEX idx_titan_spawns_active ON titan_spawns(expires_at) 
-    WHERE captured_by IS NULL AND expires_at > NOW();
+-- Note: Partial index with NOW() not supported, using simple index instead
+CREATE INDEX idx_titan_spawns_active ON titan_spawns(expires_at, captured_by);
 CREATE INDEX idx_titan_spawns_poi ON titan_spawns(poi_id);
 
 -- Player location history

@@ -194,7 +194,7 @@ impl CaptureService {
                 id: titan_id,
                 species_id,
                 // Other fields don't matter for signature
-                poi_id: Uuid::nil(),
+                poi_id: Some(Uuid::nil()),
                 location_lat: 0.0,
                 location_lng: 0.0,
                 geohash: String::new(),

@@ -62,7 +62,7 @@ impl ThreatClass {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct TitanSpawn {
     pub id: Uuid,
-    pub poi_id: Uuid,
+    pub poi_id: Option<Uuid>,
     pub location_lat: f64,
     pub location_lng: f64,
     pub geohash: String,

@@ -15,7 +15,7 @@ services:
       POSTGRES_PASSWORD: breach_dev_password
       POSTGRES_DB: breach
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d:ro

@@ -24,12 +24,9 @@ impl Database {
 
         tracing::info!("✅ PostgreSQL connected");
 
-        // Run migrations
-        sqlx::migrate!("./migrations")
-            .run(&pg)
-            .await?;
-
-        tracing::info!("✅ Database migrations applied");
+        // Note: Migrations are run by Docker init script
+        // To run manually: sqlx migrate run
+        tracing::info!("✅ Database ready (migrations managed by Docker)");
 
         // Redis connection
         let redis_client = redis::Client::open(config.redis.url.as_str())?;

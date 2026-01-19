@@ -32,7 +32,8 @@ async fn get_nearby_titans(
     State(state): State<Arc<AppState>>,
     Query(query): Query<NearbyQuery>,
 ) -> ApiResult<Json<Vec<TitanSpawnResponse>>> {
-    let radius = query.radius.min(2000.0); // Cap at 2km
+    // Cap radius at 50km for performance
+    let radius = query.radius.min(50_000.0);
 
     let titans = state
         .services
