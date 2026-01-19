@@ -16,6 +16,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-01-20
+
+### Added
+- **Game Economy Whitepaper** - Comprehensive economic design document
+  - Stakeholder analysis (players, investors, project team)
+  - Token flow model with dynamic emission control
+  - Titan NFT economy with supply/demand balance
+  - Geographic fairness algorithm
+  - Player progression systems (newbie journey, long-term goals)
+  - Monetization model (non-P2W)
+  - Anti-cheat systems with location verification
+  - Social systems (friends, guilds, world boss)
+  - Emergency protocols and circuit breakers
+  - Key metrics and monitoring dashboard
+
+### Documentation
+- New file: `docs/GAME_ECONOMY_WHITEPAPER.md`
+
+---
+
 ## [0.3.1] - 2026-01-20
 
 ### Added
