@@ -16,6 +16,7 @@ mod db;
 mod error;
 mod middleware;
 mod models;
+mod scheduler;
 mod services;
 mod utils;
 mod websocket;
@@ -62,6 +63,9 @@ async fn main() -> anyhow::Result<()> {
         db,
         services,
     });
+
+    // Start background tasks
+    scheduler::start_background_tasks(state.clone());
 
     // Build router
     let app = Router::new()

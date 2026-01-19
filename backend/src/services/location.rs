@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::config::AppConfig;
 use crate::db::Database;
-use crate::error::{ApiResult, AppError};
+use crate::error::ApiResult;
 use crate::models::{
     LocationReport, LocationVerification, PlayerLocation, VerificationFlag, VerificationStatus,
 };

@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use axum::{
     extract::State,
-    routing::{get, post},
+    routing::post,
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::error::{ApiResult, AppError};
 use crate::services::auth::{AuthChallenge, AuthRequest, AuthResponse};
@@ -67,7 +67,7 @@ async fn authenticate(
 
 /// Refresh token (requires valid token in header)
 async fn refresh_token(
-    State(state): State<Arc<AppState>>,
+    State(_state): State<Arc<AppState>>,
     // Would need to extract from header
 ) -> ApiResult<Json<AuthResponse>> {
     // TODO: Implement token refresh

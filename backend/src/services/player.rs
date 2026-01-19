@@ -1,6 +1,5 @@
 //! Player management service
 
-use chrono::Utc;
 use uuid::Uuid;
 
 use crate::db::Database;

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use axum::{
     async_trait,
-    extract::{FromRequestParts, State},
+    extract::FromRequestParts,
     http::{header::AUTHORIZATION, request::Parts},
 };
 

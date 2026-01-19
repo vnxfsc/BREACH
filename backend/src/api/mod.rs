@@ -16,6 +16,7 @@ use crate::AppState;
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .merge(health::routes())
+        .merge(health::routes_with_state(state.clone()))
         .nest("/api/v1", api_routes(state))
 }
 

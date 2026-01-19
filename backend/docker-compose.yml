@@ -1,0 +1,86 @@
+# BREACH Backend Docker Compose
+# Development environment with all dependencies
+
+version: '3.8'
+
+services:
+  # ===========================================
+  # PostgreSQL + PostGIS
+  # ===========================================
+  postgres:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: breach-postgres
+    environment:
+      POSTGRES_USER: breach
+      POSTGRES_PASSWORD: breach_dev_password
+      POSTGRES_DB: breach
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U breach -d breach"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Redis
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: breach-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Backend API
+  # ===========================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: breach-backend
+    environment:
+      BREACH__SERVER__HOST: "0.0.0.0"
+      BREACH__SERVER__PORT: "8080"
+      BREACH__SERVER__ENV: "development"
+      BREACH__DATABASE__URL: "postgres://breach:breach_dev_password@postgres:5432/breach"
+      BREACH__DATABASE__MAX_CONNECTIONS: "10"
+      BREACH__DATABASE__MIN_CONNECTIONS: "2"
+      BREACH__REDIS__URL: "redis://redis:6379"
+      BREACH__REDIS__POOL_SIZE: "10"
+      BREACH__SOLANA__RPC_URL: "https://api.devnet.solana.com"
+      BREACH__SOLANA__WS_URL: "wss://api.devnet.solana.com"
+      BREACH__SOLANA__TITAN_PROGRAM_ID: "3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7"
+      BREACH__SOLANA__GAME_PROGRAM_ID: "DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX"
+      BREACH__SOLANA__BREACH_TOKEN_MINT: "CSH2Vz4MbgTLzB9SYJ7gBwNsyu7nKpbvEJzKQLgmmjt4"
+      BREACH__AUTH__JWT_SECRET: "development-secret-change-in-production"
+      BREACH__AUTH__JWT_EXPIRY_HOURS: "24"
+      BREACH__GAME__CAPTURE_RADIUS_METERS: "50.0"
+      BREACH__GAME__CAPTURE_COOLDOWN_SECONDS: "300"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: breach-network

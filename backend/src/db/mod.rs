@@ -40,6 +40,3 @@ impl Database {
         Ok(Self { pg, redis })
     }
 }
-
-// Re-export commonly used types
-pub use sqlx::FromRow;

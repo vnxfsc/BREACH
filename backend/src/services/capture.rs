@@ -9,7 +9,7 @@ use crate::config::AppConfig;
 use crate::db::Database;
 use crate::error::{ApiResult, AppError};
 use crate::models::{
-    CaptureAuthorization, CaptureRequest, PlayerLocation, TitanCaptureData, TitanSpawn,
+    CaptureAuthorization, CaptureRequest, TitanCaptureData, TitanSpawn,
 };
 use crate::services::location::haversine_distance;
 

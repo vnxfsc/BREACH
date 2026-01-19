@@ -1,7 +1,7 @@
 //! Titan spawn service
 
 use chrono::{Datelike, Duration, Utc};
-use rand::Rng;
+use rand::{Rng, RngCore};
 use uuid::Uuid;
 
 use crate::config::AppConfig;
@@ -37,8 +37,13 @@ impl SpawnService {
             // Calculate spawn probability
             let spawn_chance = self.calculate_spawn_probability(&poi);
 
-            let mut rng = rand::thread_rng();
-            if rng.gen::<f64>() < spawn_chance {
+            // Generate random outside of async context
+            let should_spawn = {
+                let mut rng = rand::thread_rng();
+                rng.gen::<f64>() < spawn_chance
+            };
+
+            if should_spawn {
                 let titan = self.generate_titan_for_poi(&poi).await?;
                 spawns.push(titan);
             }
@@ -119,59 +124,64 @@ impl SpawnService {
 
     /// Generate a Titan for a POI
     async fn generate_titan_for_poi(&self, poi: &POI) -> ApiResult<TitanSpawn> {
-        let mut rng = rand::thread_rng();
+        // Generate all random values BEFORE any await
+        let (element, threat_class, spawn_lat, spawn_lng, geohash, species_id, genes, max_captures, duration) = {
+            let mut rng = rand::thread_rng();
 
-        // Determine element based on terrain
-        let element = self.determine_element(poi.terrain_type);
+            // Determine element based on terrain
+            let element = self.determine_element_sync(poi.terrain_type, &mut rng);
 
-        // Determine threat class
-        let threat_class = self.determine_threat_class(poi);
+            // Determine threat class
+            let threat_class = self.determine_threat_class_sync(poi, &mut rng);
 
-        // Generate random position within POI radius
-        let angle = rng.gen::<f64>() * 2.0 * std::f64::consts::PI;
-        let distance = rng.gen::<f64>() * poi.radius;
-        let offset_lat = (distance * angle.cos()) / 111_320.0; // meters to degrees
-        let offset_lng =
-            (distance * angle.sin()) / (111_320.0 * poi.location_lat.to_radians().cos());
+            // Generate random position within POI radius
+            let angle = rng.gen::<f64>() * 2.0 * std::f64::consts::PI;
+            let distance = rng.gen::<f64>() * poi.radius;
+            let offset_lat = (distance * angle.cos()) / 111_320.0;
+            let offset_lng =
+                (distance * angle.sin()) / (111_320.0 * poi.location_lat.to_radians().cos());
 
-        let spawn_lat = poi.location_lat + offset_lat;
-        let spawn_lng = poi.location_lng + offset_lng;
+            let spawn_lat = poi.location_lat + offset_lat;
+            let spawn_lng = poi.location_lng + offset_lng;
 
-        // Generate geohash
-        let geohash = geohash::encode(
-            geohash::Coord {
-                x: spawn_lng,
-                y: spawn_lat,
-            },
-            7,
-        )
-        .unwrap_or_default();
+            // Generate geohash
+            let geohash = geohash::encode(
+                geohash::Coord {
+                    x: spawn_lng,
+                    y: spawn_lat,
+                },
+                7,
+            )
+            .unwrap_or_default();
 
-        // Calculate duration based on threat class
-        let duration = match threat_class {
-            1 => Duration::hours(4),
-            2 => Duration::hours(3),
-            3 => Duration::hours(2),
-            4 => Duration::hours(1),
-            5 => Duration::minutes(30),
-            _ => Duration::hours(2),
+            // Calculate duration based on threat class
+            let duration = match threat_class {
+                1 => Duration::hours(4),
+                2 => Duration::hours(3),
+                3 => Duration::hours(2),
+                4 => Duration::hours(1),
+                5 => Duration::minutes(30),
+                _ => Duration::hours(2),
+            };
+
+            // Generate species ID and genes
+            let species_id = self.generate_species_id_sync(element, threat_class, &mut rng);
+            let genes = self.generate_genes_sync(&mut rng);
+
+            // Determine max captures
+            let max_captures = match threat_class {
+                1 => 10,
+                2 => 5,
+                3 => 3,
+                4 => 2,
+                5 => 1,
+                _ => 5,
+            };
+
+            (element, threat_class, spawn_lat, spawn_lng, geohash, species_id, genes, max_captures, duration)
         };
 
-        // Generate species ID and genes
-        let species_id = self.generate_species_id(element, threat_class);
-        let genes = self.generate_genes();
-
-        // Determine max captures (higher class = fewer captures allowed)
-        let max_captures = match threat_class {
-            1 => 10,
-            2 => 5,
-            3 => 3,
-            4 => 2,
-            5 => 1,
-            _ => 5,
-        };
-
-        // Insert into database
+        // Now we can await - all random generation is done
         let titan = sqlx::query_as::<_, TitanSpawn>(
             r#"
             INSERT INTO titan_spawns 
@@ -205,9 +215,8 @@ impl SpawnService {
         Ok(titan)
     }
 
-    /// Determine element based on terrain
-    fn determine_element(&self, terrain: TerrainType) -> Element {
-        let mut rng = rand::thread_rng();
+    /// Determine element based on terrain (sync version with external rng)
+    fn determine_element_sync(&self, terrain: TerrainType, rng: &mut impl Rng) -> Element {
         let roll = rng.gen::<f64>() * 100.0;
 
         match terrain {
@@ -277,9 +286,8 @@ impl SpawnService {
         }
     }
 
-    /// Determine threat class based on POI category
-    fn determine_threat_class(&self, poi: &POI) -> i16 {
-        let mut rng = rand::thread_rng();
+    /// Determine threat class based on POI category (sync version)
+    fn determine_threat_class_sync(&self, poi: &POI, rng: &mut impl Rng) -> i16 {
         let roll = rng.gen::<f64>() * 100.0;
 
         // Base distribution
@@ -309,18 +317,17 @@ impl SpawnService {
         1 // Default to Class I
     }
 
-    /// Generate species ID
-    fn generate_species_id(&self, element: Element, threat_class: i16) -> i32 {
+    /// Generate species ID (sync version)
+    fn generate_species_id_sync(&self, element: Element, threat_class: i16, rng: &mut impl Rng) -> i32 {
         let element_base = element.as_u8() as i32 * 1000;
         let class_offset = (threat_class as i32 - 1) * 100;
-        let variant = rand::thread_rng().gen_range(1..=10);
+        let variant = rng.gen_range(1..=10);
 
         element_base + class_offset + variant
     }
 
-    /// Generate random gene sequence
-    fn generate_genes(&self) -> Vec<u8> {
-        let mut rng = rand::thread_rng();
+    /// Generate random gene sequence (sync version)
+    fn generate_genes_sync(&self, rng: &mut impl Rng) -> Vec<u8> {
         (0..6).map(|_| rng.gen::<u8>()).collect()
     }
 }
