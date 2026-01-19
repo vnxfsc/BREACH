@@ -254,6 +254,9 @@ flutter run
 
 - [Design Document](docs/BREACH_DESIGN_DOCUMENT.md) - Complete game design
 - [Technical Specification](docs/TECHNICAL_SPECIFICATION.md) - Technical details
+- [Smart Contract Specification](docs/SMART_CONTRACT_SPECIFICATION.md) - Pinocchio programs
+- [Game Economy Whitepaper](docs/GAME_ECONOMY_WHITEPAPER.md) - Tokenomics & NFT economy
+- [Geographic System Design](docs/GEOGRAPHIC_SYSTEM_DESIGN.md) - Map & location system
 - [API Reference](docs/API_REFERENCE.md) - API documentation
 - [Smart Contract Docs](docs/CONTRACTS.md) - Solana program docs
 
