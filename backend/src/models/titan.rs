@@ -139,3 +139,160 @@ pub struct PlayerLocation {
     pub altitude: Option<f64>,
     pub timestamp: Option<DateTime<Utc>>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================
+    // Element Tests
+    // ========================================
+
+    #[test]
+    fn test_element_from_u8_valid() {
+        assert_eq!(Element::from_u8(0), Some(Element::Abyssal));
+        assert_eq!(Element::from_u8(1), Some(Element::Volcanic));
+        assert_eq!(Element::from_u8(2), Some(Element::Storm));
+        assert_eq!(Element::from_u8(3), Some(Element::Void));
+        assert_eq!(Element::from_u8(4), Some(Element::Parasitic));
+        assert_eq!(Element::from_u8(5), Some(Element::Ossified));
+    }
+
+    #[test]
+    fn test_element_from_u8_invalid() {
+        assert_eq!(Element::from_u8(6), None);
+        assert_eq!(Element::from_u8(255), None);
+    }
+
+    #[test]
+    fn test_element_as_u8() {
+        assert_eq!(Element::Abyssal.as_u8(), 0);
+        assert_eq!(Element::Volcanic.as_u8(), 1);
+        assert_eq!(Element::Storm.as_u8(), 2);
+        assert_eq!(Element::Void.as_u8(), 3);
+        assert_eq!(Element::Parasitic.as_u8(), 4);
+        assert_eq!(Element::Ossified.as_u8(), 5);
+    }
+
+    #[test]
+    fn test_element_roundtrip() {
+        for i in 0..=5 {
+            let element = Element::from_u8(i).unwrap();
+            assert_eq!(element.as_u8(), i);
+        }
+    }
+
+    #[test]
+    fn test_element_serialize() {
+        let element = Element::Volcanic;
+        let json = serde_json::to_string(&element).unwrap();
+        assert_eq!(json, "\"volcanic\"");
+    }
+
+    #[test]
+    fn test_element_deserialize() {
+        let element: Element = serde_json::from_str("\"storm\"").unwrap();
+        assert_eq!(element, Element::Storm);
+    }
+
+    // ========================================
+    // ThreatClass Tests
+    // ========================================
+
+    #[test]
+    fn test_threat_class_valid() {
+        assert!(ThreatClass::new(1).is_some());
+        assert!(ThreatClass::new(2).is_some());
+        assert!(ThreatClass::new(3).is_some());
+        assert!(ThreatClass::new(4).is_some());
+        assert!(ThreatClass::new(5).is_some());
+    }
+
+    #[test]
+    fn test_threat_class_invalid() {
+        assert!(ThreatClass::new(0).is_none());
+        assert!(ThreatClass::new(6).is_none());
+        assert!(ThreatClass::new(-1).is_none());
+        assert!(ThreatClass::new(100).is_none());
+    }
+
+    #[test]
+    fn test_threat_class_value() {
+        let tc = ThreatClass::new(3).unwrap();
+        assert_eq!(tc.0, 3);
+    }
+
+    // ========================================
+    // GeoPoint Tests
+    // ========================================
+
+    #[test]
+    fn test_geopoint_serialize() {
+        let point = GeoPoint { lat: 35.6762, lng: 139.6503 };
+        let json = serde_json::to_string(&point).unwrap();
+        assert!(json.contains("35.6762"));
+        assert!(json.contains("139.6503"));
+    }
+
+    #[test]
+    fn test_geopoint_deserialize() {
+        let json = r#"{"lat": 35.6762, "lng": 139.6503}"#;
+        let point: GeoPoint = serde_json::from_str(json).unwrap();
+        assert_eq!(point.lat, 35.6762);
+        assert_eq!(point.lng, 139.6503);
+    }
+
+    // ========================================
+    // PlayerLocation Tests
+    // ========================================
+
+    #[test]
+    fn test_player_location_minimal() {
+        let json = r#"{
+            "lat": 35.6762,
+            "lng": 139.6503,
+            "accuracy": 10.0
+        }"#;
+        let loc: PlayerLocation = serde_json::from_str(json).unwrap();
+        assert_eq!(loc.lat, 35.6762);
+        assert_eq!(loc.lng, 139.6503);
+        assert_eq!(loc.accuracy, 10.0);
+        assert!(loc.speed.is_none());
+        assert!(loc.heading.is_none());
+    }
+
+    #[test]
+    fn test_player_location_full() {
+        let json = r#"{
+            "lat": 35.6762,
+            "lng": 139.6503,
+            "accuracy": 5.0,
+            "speed": 1.5,
+            "heading": 45.0,
+            "altitude": 100.0
+        }"#;
+        let loc: PlayerLocation = serde_json::from_str(json).unwrap();
+        assert_eq!(loc.speed, Some(1.5));
+        assert_eq!(loc.heading, Some(45.0));
+        assert_eq!(loc.altitude, Some(100.0));
+    }
+
+    // ========================================
+    // CaptureRequest Tests
+    // ========================================
+
+    #[test]
+    fn test_capture_request_deserialize() {
+        let json = r#"{
+            "titan_id": "550e8400-e29b-41d4-a716-446655440000",
+            "player_location": {
+                "lat": 35.6762,
+                "lng": 139.6503,
+                "accuracy": 10.0
+            }
+        }"#;
+        let req: CaptureRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.titan_id.to_string(), "550e8400-e29b-41d4-a716-446655440000");
+        assert_eq!(req.player_location.lat, 35.6762);
+    }
+}

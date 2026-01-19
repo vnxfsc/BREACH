@@ -16,6 +16,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.2] - 2026-01-20
+
+### Added - Unit Tests
+
+#### Test Infrastructure
+- Added library target (`lib.rs`) to enable unit testing
+- Created test utilities module (`tests/common/mod.rs`)
+- Added dev dependencies: `mockall`, `fake`, `pretty_assertions`, `test-case`, `async-trait`
+
+#### Geographic Utilities Tests (`utils/geo.rs`) - 18 tests
+- **Haversine distance**: Tokyo-Osaka (~400km), same point, antipodal, short distance, symmetry
+- **Bearing**: North, East, South, West directions
+- **Destination point**: North, East, round-trip verification
+- **Random point in circle**: Bounds checking, uniform distribution
+- **Geohash neighbors**: Valid, short, unique, edge cases
+- **Edge cases**: Poles, date line crossing
+
+#### Model Tests (`models/`) - 24 tests
+- **Titan models** (`titan.rs`): Element enum conversion, serialization, ThreatClass validation, GeoPoint, PlayerLocation, CaptureRequest
+- **Player models** (`player.rs`): PlayerSession serialization, experience/level calculations, UpdatePlayer, PlayerStats
+
+#### Authentication Tests (`services/auth.rs`) - 15 tests
+- **Challenge generation**: Format, unique nonce, 5-minute expiry
+- **JWT tokens**: Generate and verify, expiry time, invalid token, wrong secret
+- **Signature verification**: Invalid wallet, wrong length, invalid signature format
+- **Request/Response serialization**: AuthChallenge, AuthRequest, AuthResponse
+
+#### Integration Tests (`tests/api_tests.rs`)
+- Health check endpoints
+- Authentication flow tests
+- Protected endpoint access tests
+- Map, Quest, Achievement, Marketplace, Chat, PvP endpoint tests
+
+### Technical Details
+- **Total tests**: 57 unit tests passing
+- **Test coverage**: utils, models, services
+- **Dependencies added**: `futures-util = "0.3"`, `base64 = "0.21"`
+- Run tests: `cargo test --lib`
+
+---
+
 ## [0.7.1] - 2026-01-20
 
 ### Fixed - Code Quality & TODO Completion

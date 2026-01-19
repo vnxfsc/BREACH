@@ -13,6 +13,7 @@ use axum::{
     routing::get,
     Router,
 };
+use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, RwLock};
@@ -429,7 +430,9 @@ async fn ws_handler(
 
 /// Handle WebSocket connection
 async fn handle_socket(socket: WebSocket, state: Arc<AppState>, query: WsQuery) {
-    let (mut sender, mut receiver) = socket.split();
+    let (sender, receiver) = socket.split();
+    let mut sender: SplitSink<WebSocket, Message> = sender;
+    let mut receiver: SplitStream<WebSocket> = receiver;
     let connection_id = Uuid::new_v4().to_string();
 
     // Try to authenticate if token provided
@@ -447,7 +450,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, query: WsQuery) 
 
     // Subscribe to initial geohash
     let initial_geohash = query.geohash.clone();
-    let mut receivers = state.broadcaster.subscribe(&connection_id, vec![initial_geohash.clone()]).await;
+    let mut receivers: Vec<broadcast::Receiver<WsMessage>> = state.broadcaster.subscribe(&connection_id, vec![initial_geohash.clone()]).await;
 
     // Send welcome message
     let welcome = WsMessage::Welcome {

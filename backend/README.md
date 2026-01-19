@@ -111,6 +111,44 @@ cargo fmt
 cargo clippy
 ```
 
+## Testing
+
+### Unit Tests
+
+57 unit tests covering core functionality:
+
+```bash
+# Run all unit tests
+cargo test --lib
+
+# Run specific test module
+cargo test --lib utils::geo
+cargo test --lib models::titan
+cargo test --lib services::auth
+```
+
+| Module | Tests | Coverage |
+|--------|-------|----------|
+| `utils/geo.rs` | 18 | Haversine, bearing, geohash, random point |
+| `models/titan.rs` | 14 | Element, ThreatClass, serialization |
+| `models/player.rs` | 10 | Session, experience, level calculations |
+| `services/auth.rs` | 15 | JWT, challenge, signature verification |
+
+### Integration Tests
+
+```bash
+# Run integration tests (requires running server)
+cargo test --test api_tests -- --ignored
+```
+
+### Test Coverage
+
+Key areas covered:
+- **Geographic calculations**: Distance, bearing, destination points
+- **Model serialization**: JSON encode/decode for all API models
+- **Authentication**: Token generation, verification, expiry
+- **Business logic**: Experience/level calculations, validation
+
 ## API Endpoints
 
 ### Authentication

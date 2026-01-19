@@ -6,6 +6,14 @@ authors = ["BREACH Team"]
 description = "BREACH - Titan Hunter Backend API Server"
 license = "MIT"
 
+[[bin]]
+name = "breach-backend"
+path = "src/main.rs"
+
+[lib]
+name = "breach_backend"
+path = "src/lib.rs"
+
 [dependencies]
 # Web Framework
 axum = { version = "0.7", features = ["ws", "macros"] }
@@ -24,14 +32,17 @@ redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+base64 = "0.21"
 
-# Crypto & Auth (using older ed25519-dalek for solana compatibility)
-ed25519-dalek = "1.0"
+# Crypto & Auth
+ed25519-dalek = "2.1"
 bs58 = "0.5"
 jsonwebtoken = "9.2"
 sha2 = "0.10"
 rand = "0.8"
-base64 = "0.21"
+
+# Note: Solana SDK removed - backend uses ed25519-dalek directly for signature verification
+# Smart contract interactions will be handled via RPC calls, not SDK
 
 # Utilities
 uuid = { version = "1.6", features = ["v4", "serde"] }
@@ -56,6 +67,11 @@ validator = { version = "0.16", features = ["derive"] }
 [dev-dependencies]
 tokio-test = "0.4"
 reqwest = { version = "0.11", features = ["json"] }
+mockall = "0.12"
+fake = { version = "2.9", features = ["derive", "uuid", "chrono"] }
+pretty_assertions = "1.4"
+test-case = "3.3"
+async-trait = "0.1"
 
 [profile.release]
 lto = true

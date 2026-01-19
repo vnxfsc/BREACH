@@ -10,29 +10,10 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod api;
-mod config;
-mod db;
-mod error;
-mod middleware;
-mod models;
-mod scheduler;
-mod services;
-mod utils;
-mod websocket;
-
-use config::AppConfig;
-use db::Database;
-use services::Services;
-use websocket::Broadcaster;
-
-/// Application state shared across all handlers
-pub struct AppState {
-    pub config: AppConfig,
-    pub db: Database,
-    pub services: Services,
-    pub broadcaster: Broadcaster,
-}
+use breach_backend::{
+    api, config::AppConfig, db::Database, scheduler, services::Services, 
+    websocket, websocket::Broadcaster, AppState,
+};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
