@@ -24,12 +24,14 @@ mod websocket;
 use config::AppConfig;
 use db::Database;
 use services::Services;
+use websocket::Broadcaster;
 
 /// Application state shared across all handlers
 pub struct AppState {
     pub config: AppConfig,
     pub db: Database,
     pub services: Services,
+    pub broadcaster: Broadcaster,
 }
 
 #[tokio::main]
@@ -57,11 +59,16 @@ async fn main() -> anyhow::Result<()> {
     let services = Services::new(&config, db.clone());
     tracing::info!("✅ Services initialized");
 
+    // Create broadcaster for real-time updates
+    let broadcaster = Broadcaster::new();
+    tracing::info!("✅ WebSocket broadcaster initialized");
+
     // Create shared state
     let state = Arc::new(AppState {
         config: config.clone(),
         db,
         services,
+        broadcaster,
     });
 
     // Start background tasks
