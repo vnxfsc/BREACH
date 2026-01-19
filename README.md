@@ -127,14 +127,26 @@ breach/
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Deployment Status
+
+| Network | Program | Program ID | Status |
+|---------|---------|------------|--------|
+| **Devnet** | Titan NFT | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Live |
+| Devnet | Game Logic | TBD | 🔜 Planned |
+| Mainnet | All | TBD | 🔜 Planned |
+
+**Explorer**: [View Titan NFT Program](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
+
+---
+
+## 🛠️ Getting Started
 
 ### Prerequisites
 
 - Rust 1.75+
 - Flutter 3.16+
-- Solana CLI 1.17+
-- Pinocchio 0.29+
+- Solana CLI 2.0+
+- Pinocchio 0.8+
 - Docker & Docker Compose
 - PostgreSQL 16+
 - Redis 7+
@@ -166,8 +178,14 @@ cargo sqlx migrate run
 
 ```bash
 cd contracts
-pinocchio build
-pinocchio deploy --provider.cluster devnet
+
+# Build
+cargo build-sbf
+
+# Deploy (Titan NFT already deployed)
+solana config set --url devnet
+solana airdrop 2
+solana program deploy target/deploy/titan_nft.so
 ```
 
 5. **Run backend services**

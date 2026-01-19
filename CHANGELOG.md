@@ -10,10 +10,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
+- Game Logic Program development
 - Mobile app development (Flutter)
-- Smart contract deployment to devnet
 - Backend API implementation
 - AR capture system integration
+
+---
+
+## [0.2.0] - 2026-01-20
+
+### Added
+
+#### Smart Contracts
+- **Titan NFT Program** - Complete implementation with Pinocchio framework
+  - `initialize` - Program initialization with CPI account creation
+  - `mint_titan` - Mint Titan NFTs with auto Player/Titan account creation
+  - `level_up` - Level up Titans (requires experience)
+  - `evolve` - Evolve Titans (requires Level 30+)
+  - `fuse` - Fuse two Titans (requires Level 20+, same element)
+  - `transfer` - Transfer Titan ownership
+  - `update_config` - Admin configuration updates
+  - `set_paused` - Pause/unpause program
+
+#### Account Structures
+- `GlobalConfig` (182 bytes) - Program configuration with packed repr
+- `TitanData` (118 bytes) - Titan NFT on-chain data
+- `PlayerAccount` (152 bytes) - Player profile and statistics
+
+#### Testing
+- TypeScript integration test suite (14 tests, 100% passing)
+- Test coverage for all instructions
+- Error handling validation
+
+### Deployed
+- **Devnet**: `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7`
+
+### Technical Details
+- Framework: Pinocchio 0.8
+- Program Size: ~23KB
+- Zero-copy deserialization for performance
+- CPI-based PDA account creation
 
 ---
 
@@ -77,23 +113,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.2.0 | 2026-01-20 | Titan NFT Program deployed to Devnet |
 | 0.1.0 | 2026-01-20 | Initial release with documentation and website |
 
 ---
 
 ## Upcoming Releases
 
-### v0.2.0 (Planned)
-- Smart contract development
-- Devnet deployment
-- Basic testing suite
-
 ### v0.3.0 (Planned)
+- Game Logic Program development
+- Battle system implementation
+- Experience/reward mechanics
+
+### v0.4.0 (Planned)
 - Backend API development
 - Database schema implementation
 - Authentication system
 
-### v0.4.0 (Planned)
+### v0.5.0 (Planned)
 - Mobile app MVP
 - AR capture prototype
 - Wallet integration
@@ -110,8 +147,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [GitHub Repository](https://github.com/vnxfsc/BREACH)
 - [Live Website](https://breach-jade.vercel.app)
 - [Documentation](https://breach-jade.vercel.app/docs)
+- [Devnet Program](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
 
 ---
 
-[Unreleased]: https://github.com/vnxfsc/BREACH/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/vnxfsc/BREACH/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/vnxfsc/BREACH/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vnxfsc/BREACH/releases/tag/v0.1.0

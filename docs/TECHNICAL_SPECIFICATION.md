@@ -966,7 +966,8 @@ use pinocchio::{
 };
 use pinocchio_token::instructions::{Transfer, Burn};
 
-pinocchio::declare_id!("BREACHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+// Titan NFT Program ID (Devnet)
+pub const PROGRAM_ID: Pubkey = pinocchio_pubkey::pubkey!("3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7");
 
 entrypoint!(process_instruction);
 

@@ -67,7 +67,7 @@ This document specifies the smart contract architecture for BREACH, a Solana-pow
 │                    BREACH Smart Contracts               │
 ├─────────────────────────────────────────────────────────┤
 │  Language:        Rust                                  │
-│  Framework:       Pinocchio 0.6+                        │
+│  Framework:       Pinocchio 0.8+                        │
 │  Blockchain:      Solana (Mainnet-beta)                 │
 │  NFT Standard:    Metaplex Token Metadata + Bubblegum   │
 │  Token Standard:  SPL Token / Token-2022                │
@@ -89,7 +89,8 @@ edition = "2021"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-pinocchio = "0.6"
+pinocchio = "0.8"
+pinocchio-pubkey = "0.2"
 pinocchio-token = "0.3"
 pinocchio-system = "0.2"
 solana-program = "2.0"
@@ -1242,7 +1243,16 @@ macro_rules! require_owned_by {
 
 ## 11. Deployment Guide
 
-### 11.1 Prerequisites
+### 11.1 Deployment Status
+
+| Network | Program ID | Status |
+|---------|------------|--------|
+| **Devnet** | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Deployed |
+| Mainnet | TBD | 🔜 Planned |
+
+**Explorer**: [View on Solana Explorer](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
+
+### 11.2 Prerequisites
 
 ```bash
 # Install Rust
@@ -1254,10 +1264,10 @@ sh -c "$(curl -sSfL https://release.solana.com/v2.0.0/install)"
 # Configure for devnet
 solana config set --url devnet
 solana-keygen new
-solana airdrop 5
+solana airdrop 2
 ```
 
-### 11.2 Build & Deploy
+### 11.3 Build & Deploy
 
 ```bash
 # Clone repository
@@ -1267,23 +1277,31 @@ cd BREACH/contracts
 # Build (Pinocchio uses standard cargo-build-sbf)
 cargo build-sbf
 
-# Get program keypair
+# Generate program keypair (first time only)
 solana-keygen new -o target/deploy/titan_nft-keypair.json
 
-# Deploy
-solana program deploy target/deploy/titan_nft.so
+# Get program ID
+solana address -k target/deploy/titan_nft-keypair.json
 
-# Save program ID and update in lib.rs
+# Update PROGRAM_ID in lib.rs
+# pub const PROGRAM_ID: Pubkey = pinocchio_pubkey::pubkey!("YOUR_PROGRAM_ID");
+
+# Rebuild after updating program ID
+cargo build-sbf
+
+# Deploy
+solana program deploy target/deploy/titan_nft.so --program-id target/deploy/titan_nft-keypair.json
 ```
 
-### 11.3 Verification
+### 11.4 Verification
 
 ```bash
 # Verify deployment
-solana program show <PROGRAM_ID>
+solana program show 3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7
 
-# Check account data
-solana account <PDA_ADDRESS>
+# Check GlobalConfig PDA
+# PDA: seed = "global_config"
+solana account <CONFIG_PDA_ADDRESS>
 ```
 
 ---
@@ -1350,49 +1368,68 @@ mod tests {
 }
 ```
 
-### 12.2 Integration Tests
+### 12.2 Integration Tests (TypeScript)
 
-```rust
-// tests/integration.rs
-use solana_program_test::*;
-use solana_sdk::{
-    signature::{Keypair, Signer},
-    transaction::Transaction,
-};
+Integration tests are implemented in TypeScript using `@solana/web3.js`:
 
-#[tokio::test]
-async fn test_initialize() {
-    let program_id = Pubkey::new_unique();
-    let mut program_test = ProgramTest::new(
-        "titan_nft",
-        program_id,
-        processor!(process_instruction),
-    );
-    
-    let (mut banks_client, payer, recent_blockhash) = program_test.start().await;
-    
-    // Create initialize instruction
-    // ...
-    
-    // Process transaction
-    // ...
-    
-    // Verify config account
-    // ...
-}
+```bash
+cd contracts/tests
+pnpm install
+pnpm test
+```
+
+**Test Suite Coverage (14/14 passing):**
+
+| Test | Description | Status |
+|------|-------------|--------|
+| Initialize | Create GlobalConfig PDA | ✅ Pass |
+| Read Config | Verify config data | ✅ Pass |
+| Update Config | Modify config settings | ✅ Pass |
+| Set Paused (true) | Pause program | ✅ Pass |
+| Set Paused (false) | Unpause program | ✅ Pass |
+| Mint While Paused | Reject mint when paused | ✅ Pass |
+| Mint Titan | Create Titan NFT | ✅ Pass |
+| Read Player | Verify player account | ✅ Pass |
+| Level Up | Level up Titan | ✅ Pass |
+| Evolve | Evolve Titan (Lv30+) | ✅ Pass |
+| Fuse | Fuse two Titans | ✅ Pass |
+
+```typescript
+// Example: Initialize test
+const configPda = PublicKey.findProgramAddressSync(
+  [Buffer.from("global_config")],
+  PROGRAM_ID
+)[0];
+
+const tx = new Transaction().add(
+  new TransactionInstruction({
+    keys: [
+      { pubkey: authority.publicKey, isSigner: true, isWritable: true },
+      { pubkey: configPda, isSigner: false, isWritable: true },
+      { pubkey: treasury.publicKey, isSigner: false, isWritable: false },
+      { pubkey: breachMint.publicKey, isSigner: false, isWritable: false },
+      { pubkey: captureAuthority.publicKey, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    programId: PROGRAM_ID,
+    data: Buffer.from([0]), // Instruction ID = 0 (initialize)
+  })
+);
 ```
 
 ---
 
 ## Appendix A: Account Sizes
 
-| Account | Size (bytes) | Rent (SOL) |
-|---------|-------------|------------|
-| GlobalConfig | 215 | ~0.00168 |
-| TitanData | 110 | ~0.00156 |
-| PlayerAccount | 152 | ~0.00162 |
-| Listing | 128 | ~0.00159 |
-| Battle | 256 | ~0.00176 |
+| Account | Size (bytes) | Rent (SOL) | Notes |
+|---------|-------------|------------|-------|
+| GlobalConfig | 182 | ~0.00165 | `#[repr(packed)]` for exact size |
+| TitanData | 118 | ~0.00157 | `#[repr(packed)]` for exact size |
+| PlayerAccount | 152 | ~0.00162 | Player stats and Titan count |
+| Listing | 128 | ~0.00159 | NFT marketplace listing |
+| Battle | 256 | ~0.00176 | Battle record |
+
+> **Note**: All core accounts use `#[repr(packed)]` attribute to ensure exact size without padding.
 
 ---
 
