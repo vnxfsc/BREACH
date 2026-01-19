@@ -6,7 +6,7 @@ port = 8080
 env = "development"
 
 [database]
-url = "postgres://localhost/breach"
+url = "postgres://breach:breach@localhost:5433/breach"
 max_connections = 10
 min_connections = 2
 

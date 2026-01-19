@@ -3,11 +3,10 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, State},
     routing::get,
     Json, Router,
 };
-use serde::Deserialize;
 
 use crate::error::{ApiResult, AppError};
 use crate::middleware::auth::AuthPlayer;
@@ -69,34 +68,11 @@ async fn get_player(
     Ok(Json(player))
 }
 
-/// Leaderboard query params
-#[derive(Debug, Deserialize)]
-pub struct LeaderboardQuery {
-    #[serde(default = "default_limit")]
-    pub limit: i64,
-}
-
-fn default_limit() -> i64 {
-    100
-}
-
-/// Get leaderboard
-async fn get_leaderboard(
-    State(state): State<Arc<AppState>>,
-    Query(query): Query<LeaderboardQuery>,
-) -> ApiResult<Json<Vec<Player>>> {
-    let limit = query.limit.min(100);
-
-    let players = state.services.player.get_leaderboard(limit).await?;
-
-    Ok(Json(players))
-}
-
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/player/me", get(get_me).put(update_me))
         .route("/player/me/stats", get(get_my_stats))
         .route("/player/:player_id", get(get_player))
-        .route("/leaderboard", get(get_leaderboard))
+        // Note: /leaderboard is now handled by leaderboard.rs
         .with_state(state)
 }
