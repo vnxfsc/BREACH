@@ -1,0 +1,59 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0f"/>
+      <stop offset="100%" style="stop-color:#050508"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00d4ff"/>
+      <stop offset="50%" style="stop-color:#0099cc"/>
+      <stop offset="100%" style="stop-color:#ff6b35"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGrad)"/>
+  
+  <!-- Grid pattern -->
+  <g opacity="0.1">
+    <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+      <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#00d4ff" stroke-width="0.5"/>
+    </pattern>
+    <rect width="1200" height="630" fill="url(#grid)"/>
+  </g>
+  
+  <!-- Glow orbs -->
+  <circle cx="200" cy="200" r="150" fill="#00d4ff" opacity="0.1" filter="url(#glow)"/>
+  <circle cx="1000" cy="450" r="150" fill="#ff6b35" opacity="0.1" filter="url(#glow)"/>
+  
+  <!-- Breach rift effect -->
+  <ellipse cx="600" cy="250" rx="80" ry="150" fill="#00d4ff" opacity="0.05"/>
+  <ellipse cx="600" cy="250" rx="40" ry="100" fill="#00d4ff" opacity="0.1"/>
+  
+  <!-- Main title -->
+  <text x="600" y="280" font-family="Arial Black, sans-serif" font-size="140" font-weight="900" text-anchor="middle" fill="url(#textGrad)" filter="url(#glow)">BREACH</text>
+  
+  <!-- Tagline -->
+  <text x="600" y="360" font-family="Arial, sans-serif" font-size="36" text-anchor="middle" fill="#ffffff" opacity="0.9">Hunt. Capture. Dominate.</text>
+  
+  <!-- Description -->
+  <text x="600" y="420" font-family="Arial, sans-serif" font-size="24" text-anchor="middle" fill="#a0a0b0">A Solana-powered AR monster hunting game</text>
+  
+  <!-- Badge -->
+  <rect x="500" y="470" width="200" height="40" rx="20" fill="#00d4ff" opacity="0.2"/>
+  <rect x="500" y="470" width="200" height="40" rx="20" stroke="#00d4ff" stroke-width="1" fill="none" opacity="0.5"/>
+  <text x="600" y="497" font-family="Arial, sans-serif" font-size="16" font-weight="bold" text-anchor="middle" fill="#00d4ff">Built on Solana</text>
+  
+  <!-- Decorative elements -->
+  <path d="M100 550 L150 530 L120 580 L100 550 Z" fill="#00d4ff" opacity="0.3"/>
+  <path d="M1100 80 L1050 100 L1080 50 L1100 80 Z" fill="#ff6b35" opacity="0.3"/>
+  <path d="M150 100 L180 120 L140 130 L150 100 Z" fill="#00d4ff" opacity="0.2"/>
+  <path d="M1050 500 L1020 520 L1060 530 L1050 500 Z" fill="#ff6b35" opacity="0.2"/>
+</svg>

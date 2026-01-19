@@ -1,0 +1,23 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4ff"/>
+      <stop offset="100%" style="stop-color:#ff6b35"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" rx="100" fill="#0a0a0f"/>
+  
+  <!-- Rift effect -->
+  <ellipse cx="256" cy="256" rx="60" ry="120" fill="#00d4ff" opacity="0.2"/>
+  <ellipse cx="256" cy="256" rx="30" ry="80" fill="#00d4ff" opacity="0.3"/>
+  
+  <!-- B letter stylized -->
+  <path d="M160 140 L160 372 L280 372 C340 372 380 332 380 280 C380 245 360 220 330 210 C355 200 370 175 370 145 C370 100 335 140 280 140 L160 140 Z M220 190 L270 190 C295 190 310 205 310 225 C310 245 295 260 270 260 L220 260 L220 190 Z M220 305 L280 305 C310 305 325 290 325 265 C325 240 310 305 280 305 L220 305 Z" 
+        fill="url(#iconGrad)"/>
+  
+  <!-- Decorative elements -->
+  <circle cx="380" cy="140" r="20" fill="#ff6b35" opacity="0.6"/>
+  <circle cx="130" cy="380" r="15" fill="#00d4ff" opacity="0.6"/>
+</svg>

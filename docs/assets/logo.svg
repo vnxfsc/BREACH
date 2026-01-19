@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120">
+  <defs>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#0099cc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff6b35;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="glowGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4ff;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#00d4ff;stop-opacity:0" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="400" height="120" fill="#0a0a0f"/>
+  
+  <!-- Rift effect -->
+  <path d="M180 10 L200 60 L180 110" stroke="url(#glowGradient)" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M220 10 L200 60 L220 110" stroke="url(#glowGradient)" stroke-width="2" fill="none" opacity="0.6"/>
+  
+  <!-- Main text -->
+  <text x="200" y="75" 
+        font-family="Arial Black, Arial, sans-serif" 
+        font-size="56" 
+        font-weight="900"
+        text-anchor="middle" 
+        fill="url(#textGradient)"
+        filter="url(#glow)"
+        letter-spacing="8">
+    BREACH
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="200" y="100" 
+        font-family="Arial, sans-serif" 
+        font-size="10" 
+        text-anchor="middle" 
+        fill="#666"
+        letter-spacing="4">
+    HUNT. CAPTURE. DOMINATE.
+  </text>
+</svg>

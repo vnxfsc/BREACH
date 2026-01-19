@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+target/
+.dart_tool/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Build outputs
+dist/
+out/
+*.js.map
+
+# Rust
+Cargo.lock
+**/*.rs.bk
+
+# Flutter
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+*.dart.js
+*.g.dart
+
+# Solana
+.anchor/
+test-ledger/
+
+# Database
+*.sqlite
+*.db
+
+# Coverage
+coverage/
+*.lcov
+
+# Temporary
+tmp/
+temp/
+*.tmp
+*.swp
