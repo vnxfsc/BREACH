@@ -12,9 +12,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Mobile app development (Flutter)
 - AR capture system integration
-- Trading marketplace
-- Real-time chat system
 - Mainnet deployment
+
+---
+
+## [0.7.0] - 2026-01-20
+
+### Added - Marketplace & Chat Systems
+
+#### NFT Marketplace
+- **Database Schema** (`20260120000004_marketplace.sql`)
+  - `marketplace_listings` - NFT listing support (fixed price & auctions)
+  - `auction_bids` - Auction bid tracking
+  - `marketplace_transactions` - Transaction history
+  - `price_offers` - Direct buy offers
+  - `listing_favorites` - Watchlist functionality
+  - `price_history` - Price analytics data
+  - `marketplace_stats` - Aggregated statistics
+
+- **Marketplace Service** (`services/marketplace.rs`)
+  - Create/cancel listings (fixed price & auction)
+  - Buy fixed-price listings
+  - Place auction bids
+  - Make/accept/reject offers
+  - Favorites management
+  - Transaction history
+  - Price chart analytics
+  - 2.5% platform fee calculation
+
+- **Marketplace API** (15 endpoints)
+  - `GET /marketplace` - Search listings
+  - `POST /marketplace/listings` - Create listing
+  - `GET /marketplace/listings/:id` - Get listing details
+  - `DELETE /marketplace/listings/:id` - Cancel listing
+  - `POST /marketplace/listings/:id/buy` - Buy listing
+  - `GET /marketplace/listings/:id/bids` - Get auction bids
+  - `POST /marketplace/listings/:id/bids` - Place bid
+  - `POST /marketplace/offers` - Make offer
+  - `GET /marketplace/offers/received` - Received offers
+  - `GET /marketplace/offers/sent` - Sent offers
+  - `POST /marketplace/offers/:id/accept` - Accept offer
+  - `POST /marketplace/offers/:id/reject` - Reject offer
+  - `GET /marketplace/favorites` - Get favorites
+  - `POST/DELETE /marketplace/favorites/:id` - Manage favorites
+  - `GET /marketplace/my-listings` - My listings
+  - `GET /marketplace/stats` - Marketplace statistics
+  - `GET /marketplace/history` - Transaction history
+  - `GET /marketplace/price-chart` - Price chart data
+
+#### Real-time Chat System
+- **Database Schema** (`20260120000005_chat.sql`)
+  - `chat_channels` - Channel types (world/guild/private/trade/help)
+  - `chat_messages` - Message storage with replies
+  - `chat_read_status` - Read receipts & mute settings
+  - `chat_blocked_users` - User blocking
+  - `chat_reports` - Message reporting
+  - Pre-created system channels (World/Trade/Help)
+  - PostgreSQL functions for private channels & unread counts
+
+- **Chat Service** (`services/chat.rs`)
+  - Multi-channel support (world/guild/private/trade/help)
+  - Message send/edit/delete
+  - Reply threading
+  - Read status tracking
+  - Channel muting
+  - User blocking
+  - Message reporting
+
+- **Chat API** (13 endpoints)
+  - `GET /chat/channels` - Get player channels
+  - `POST /chat/channels/private` - Start private chat
+  - `GET /chat/channels/:id/messages` - Get messages
+  - `POST /chat/channels/:id/messages` - Send message
+  - `POST /chat/channels/:id/read` - Mark as read
+  - `POST /chat/channels/:id/mute` - Mute channel
+  - `POST /chat/channels/:id/unmute` - Unmute channel
+  - `PUT /chat/messages/:id` - Edit message
+  - `DELETE /chat/messages/:id` - Delete message
+  - `POST /chat/messages/:id/report` - Report message
+  - `GET /chat/blocked` - Get blocked users
+  - `POST /chat/blocked` - Block user
+  - `DELETE /chat/blocked/:id` - Unblock user
+
+### Technical Details
+- Total API endpoints: 90+
+- Database tables: 45+
+- Services: 19
+- Models: 15 modules
 
 ---
 

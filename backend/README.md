@@ -22,6 +22,8 @@ High-performance Rust backend for the BREACH Titan Hunter game.
 - 📊 **Leaderboards** - Multiple ranking types
 - 📦 **Inventory** - Titan collection management
 - 🔄 **Real-time** - WebSocket for live updates
+- 🛒 **Marketplace** - NFT trading (fixed price & auctions)
+- 💬 **Chat** - World/guild/private messaging
 
 ## Project Structure
 
@@ -29,7 +31,7 @@ High-performance Rust backend for the BREACH Titan Hunter game.
 backend/
 ├── src/
 │   ├── main.rs              # Entry point + server setup
-│   ├── api/                  # HTTP endpoints (17 modules)
+│   ├── api/                  # HTTP endpoints (19 modules)
 │   │   ├── auth.rs          # Authentication
 │   │   ├── capture.rs       # Capture authorization
 │   │   ├── map.rs           # Map/Titan queries
@@ -43,17 +45,19 @@ backend/
 │   │   ├── battle.rs        # Wild battles
 │   │   ├── inventory.rs     # Titan inventory
 │   │   ├── leaderboard.rs   # Rankings
+│   │   ├── marketplace.rs   # NFT marketplace
+│   │   ├── chat.rs          # Chat system
 │   │   └── health.rs        # Health checks
 │   ├── config/              # Configuration
 │   ├── db/                  # Database connections
 │   ├── error/               # Error handling
 │   ├── middleware/          # Auth middleware
-│   ├── models/              # Data models (12 modules)
-│   ├── services/            # Business logic (17 modules)
+│   ├── models/              # Data models (15 modules)
+│   ├── services/            # Business logic (19 modules)
 │   ├── scheduler/           # Background tasks
 │   ├── utils/               # Helpers (geo, etc.)
 │   └── websocket/           # Real-time updates
-├── migrations/              # SQL migrations (4 files)
+├── migrations/              # SQL migrations (6 files)
 ├── config/                  # Config files
 ├── Dockerfile               # Container build
 ├── docker-compose.yml       # Local development
@@ -239,6 +243,48 @@ cargo clippy
 | GET | `/api/v1/leaderboard` | Get leaderboard |
 | GET | `/api/v1/leaderboard/me` | My rankings |
 | GET | `/api/v1/leaderboard/top` | Top by stat |
+
+### Marketplace
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/marketplace` | Search listings |
+| POST | `/api/v1/marketplace/listings` | Create listing |
+| GET | `/api/v1/marketplace/listings/:id` | Get listing details |
+| DELETE | `/api/v1/marketplace/listings/:id` | Cancel listing |
+| POST | `/api/v1/marketplace/listings/:id/buy` | Buy listing |
+| GET | `/api/v1/marketplace/listings/:id/bids` | Get auction bids |
+| POST | `/api/v1/marketplace/listings/:id/bids` | Place bid |
+| POST | `/api/v1/marketplace/offers` | Make offer |
+| GET | `/api/v1/marketplace/offers/received` | Received offers |
+| GET | `/api/v1/marketplace/offers/sent` | Sent offers |
+| POST | `/api/v1/marketplace/offers/:id/accept` | Accept offer |
+| POST | `/api/v1/marketplace/offers/:id/reject` | Reject offer |
+| GET | `/api/v1/marketplace/favorites` | Get favorites |
+| POST | `/api/v1/marketplace/favorites/:id` | Add favorite |
+| DELETE | `/api/v1/marketplace/favorites/:id` | Remove favorite |
+| GET | `/api/v1/marketplace/my-listings` | My listings |
+| GET | `/api/v1/marketplace/stats` | Market statistics |
+| GET | `/api/v1/marketplace/history` | Transaction history |
+| GET | `/api/v1/marketplace/price-chart` | Price chart data |
+
+### Chat
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/chat/channels` | Get player channels |
+| POST | `/api/v1/chat/channels/private` | Start private chat |
+| GET | `/api/v1/chat/channels/:id/messages` | Get messages |
+| POST | `/api/v1/chat/channels/:id/messages` | Send message |
+| POST | `/api/v1/chat/channels/:id/read` | Mark as read |
+| POST | `/api/v1/chat/channels/:id/mute` | Mute channel |
+| POST | `/api/v1/chat/channels/:id/unmute` | Unmute channel |
+| PUT | `/api/v1/chat/messages/:id` | Edit message |
+| DELETE | `/api/v1/chat/messages/:id` | Delete message |
+| POST | `/api/v1/chat/messages/:id/report` | Report message |
+| GET | `/api/v1/chat/blocked` | Get blocked users |
+| POST | `/api/v1/chat/blocked` | Block user |
+| DELETE | `/api/v1/chat/blocked/:id` | Unblock user |
 
 ### WebSocket
 
