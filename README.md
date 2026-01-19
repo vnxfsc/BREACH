@@ -129,15 +129,17 @@ breach/
 
 ## 🚀 Deployment Status
 
-| Network | Program | Program ID | Status |
-|---------|---------|------------|--------|
-| **Devnet** | Titan NFT | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Live |
-| **Devnet** | Game Logic | `DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX` | ✅ Live |
+| Network | Component | Address | Status |
+|---------|-----------|---------|--------|
+| **Devnet** | Titan NFT Program | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Live |
+| **Devnet** | Game Logic Program | `DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX` | ✅ Live |
+| **Devnet** | $BREACH Token | `CSH2Vz4MbgTLzB9SYJ7gBwNsyu7nKpbvEJzKQLgmmjt4` | ✅ Live |
 | Mainnet | All | TBD | 🔜 Planned |
 
 **Explorer**:
 - [Titan NFT Program](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
 - [Game Logic Program](https://explorer.solana.com/address/DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX?cluster=devnet)
+- [$BREACH Token](https://explorer.solana.com/address/CSH2Vz4MbgTLzB9SYJ7gBwNsyu7nKpbvEJzKQLgmmjt4?cluster=devnet)
 
 ---
 
@@ -231,11 +233,12 @@ flutter run
 
 | Allocation | Percentage | Amount |
 |------------|------------|--------|
-| Game Rewards | 40% | 400M |
-| Team | 20% | 200M |
-| Ecosystem | 15% | 150M |
-| Investors | 15% | 150M |
+| Play-to-Earn | 35% | 350M |
+| Ecosystem | 25% | 250M |
+| Team (Vested) | 15% | 150M |
+| Treasury | 10% | 100M |
 | Liquidity | 10% | 100M |
+| Advisors | 5% | 50M |
 
 ### Use Cases
 

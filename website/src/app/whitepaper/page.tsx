@@ -94,9 +94,8 @@ const sections = [
       },
       {
         subtitle: "Distribution",
-        text: `Total supply: 1,000,000,000 tokens. Allocation: Game Rewards (40%), Team (20%), 
-        Ecosystem (15%), Investors (15%), Liquidity (10%). Team tokens vest over 4 years with 
-        1-year cliff.`,
+        text: `Total supply: 1,000,000,000 tokens. Allocation: Play-to-Earn (35%), Ecosystem (25%), 
+        Team (15%), Treasury (10%), Liquidity (10%), Advisors (5%). Team tokens vest over 2 years.`,
       },
       {
         subtitle: "Earning Mechanisms",

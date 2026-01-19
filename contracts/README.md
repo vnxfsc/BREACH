@@ -4,15 +4,17 @@ Solana programs for the BREACH game, built with [Pinocchio](https://github.com/f
 
 ## 🚀 Deployment Status
 
-| Network | Program | Program ID | Status |
-|---------|---------|------------|--------|
-| **Devnet** | Titan NFT | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Live |
-| **Devnet** | Game Logic | `DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX` | ✅ Live |
+| Network | Component | Address | Status |
+|---------|-----------|---------|--------|
+| **Devnet** | Titan NFT Program | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Live |
+| **Devnet** | Game Logic Program | `DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX` | ✅ Live |
+| **Devnet** | $BREACH Token | `CSH2Vz4MbgTLzB9SYJ7gBwNsyu7nKpbvEJzKQLgmmjt4` | ✅ Live |
 | Mainnet | All | TBD | 🔜 Planned |
 
 **Explorer**:
 - [Titan NFT Program](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
 - [Game Logic Program](https://explorer.solana.com/address/DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX?cluster=devnet)
+- [$BREACH Token](https://explorer.solana.com/address/CSH2Vz4MbgTLzB9SYJ7gBwNsyu7nKpbvEJzKQLgmmjt4?cluster=devnet)
 
 ## Programs
 

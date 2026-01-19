@@ -972,11 +972,12 @@ spl-token mint <MINT_ADDRESS> 1000000000
 
 | Allocation | Percentage | Tokens | Vesting |
 |------------|------------|--------|---------|
-| Play-to-Earn | 40% | 400M | Released through gameplay |
-| Liquidity | 20% | 200M | Raydium/Orca pools |
-| Team | 15% | 150M | 2-year vesting |
-| Development | 15% | 150M | Milestone-based |
-| Marketing | 10% | 100M | Campaign-based |
+| Play-to-Earn | 35% | 350M | Released through gameplay |
+| Ecosystem | 25% | 250M | DAO governance |
+| Team (Vested) | 15% | 150M | 2-year vesting |
+| Treasury | 10% | 100M | Governance controlled |
+| Liquidity | 10% | 100M | Raydium/Orca pools |
+| Advisors | 5% | 50M | 1-year vesting |
 
 ---
 
@@ -1245,12 +1246,17 @@ macro_rules! require_owned_by {
 
 ### 11.1 Deployment Status
 
-| Network | Program ID | Status |
-|---------|------------|--------|
-| **Devnet** | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Deployed |
-| Mainnet | TBD | 🔜 Planned |
+| Network | Component | Address | Status |
+|---------|-----------|---------|--------|
+| **Devnet** | Titan NFT Program | `3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7` | ✅ Deployed |
+| **Devnet** | Game Logic Program | `DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX` | ✅ Deployed |
+| **Devnet** | $BREACH Token | `CSH2Vz4MbgTLzB9SYJ7gBwNsyu7nKpbvEJzKQLgmmjt4` | ✅ Live |
+| Mainnet | All | TBD | 🔜 Planned |
 
-**Explorer**: [View on Solana Explorer](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
+**Explorer**:
+- [Titan NFT Program](https://explorer.solana.com/address/3KYPXMcodPCbnWLDX41yWtgxe6ctsPdnT3fYgp8udmd7?cluster=devnet)
+- [Game Logic Program](https://explorer.solana.com/address/DLk2GnDu9AYn7PeLprEDHDYH9UWKENX47UqqfeiQBaSX?cluster=devnet)
+- [$BREACH Token](https://explorer.solana.com/address/CSH2Vz4MbgTLzB9SYJ7gBwNsyu7nKpbvEJzKQLgmmjt4?cluster=devnet)
 
 ### 11.2 Prerequisites
 

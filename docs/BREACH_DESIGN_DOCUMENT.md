@@ -363,11 +363,12 @@ pub struct Titan {
 
 | Category | Percentage | Amount | Release Schedule |
 |----------|------------|--------|------------------|
-| Game Rewards Pool | 40% | 400M | 4-year linear release |
-| Team | 20% | 200M | 2-year cliff + 2-year release |
-| Ecosystem/Partnerships | 15% | 150M | DAO vote determines |
-| Investors | 15% | 150M | Tiered release |
-| Liquidity | 10% | 100M | TGE 50%, remainder as needed |
+| Play-to-Earn | 35% | 350M | 4-year linear release |
+| Ecosystem | 25% | 250M | DAO vote determines |
+| Team (Vested) | 15% | 150M | 2-year cliff + 2-year release |
+| Treasury | 10% | 100M | Governance controlled |
+| Liquidity | 10% | 100M | TGE for DEX pools |
+| Advisors | 5% | 50M | 1-year vesting |
 
 ### 7.3 Consumption Scenarios
 

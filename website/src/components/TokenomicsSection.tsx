@@ -10,14 +10,17 @@ const tokenInfo = {
   name: "$BREACH",
   totalSupply: "1,000,000,000",
   chain: "Solana",
+  mintAddress: "CSH2Vz4MbgTLzB9SYJ7gBwNsyu7nKpbvEJzKQLgmmjt4",
+  network: "Devnet",
 };
 
 const distribution = [
-  { name: "Game Rewards", percent: 40, color: "#00d4ff" },
-  { name: "Team", percent: 20, color: "#a855f7" },
-  { name: "Ecosystem", percent: 15, color: "#22c55e" },
-  { name: "Investors", percent: 15, color: "#f59e0b" },
+  { name: "Play-to-Earn", percent: 35, color: "#00d4ff" },
+  { name: "Ecosystem", percent: 25, color: "#22c55e" },
+  { name: "Team (Vested)", percent: 15, color: "#a855f7" },
+  { name: "Treasury", percent: 10, color: "#f59e0b" },
   { name: "Liquidity", percent: 10, color: "#ef4444" },
+  { name: "Advisors", percent: 5, color: "#ff6b35" },
 ];
 
 const useCases = [
@@ -96,7 +99,7 @@ export default function TokenomicsSection() {
                 {[
                   { label: "Total Supply", value: tokenInfo.totalSupply },
                   { label: "Chain", value: tokenInfo.chain },
-                  { label: "Initial Circulation", value: "5%" },
+                  { label: "Network", value: tokenInfo.network },
                   { label: "Decimals", value: "9" },
                 ].map((item, index) => (
                   <motion.div
@@ -110,6 +113,23 @@ export default function TokenomicsSection() {
                     <span className="font-bold text-white">{item.value}</span>
                   </motion.div>
                 ))}
+                {/* Token Address */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={isInView ? { opacity: 1, x: 0 } : {}}
+                  transition={{ delay: 0.8 }}
+                  className="pt-4"
+                >
+                  <span className="text-[var(--color-text-secondary)] text-sm">Token Address</span>
+                  <a 
+                    href={`https://explorer.solana.com/address/${tokenInfo.mintAddress}?cluster=devnet`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block mt-1 font-mono text-xs text-[var(--color-primary)] hover:text-[var(--color-accent)] transition-colors truncate"
+                  >
+                    {tokenInfo.mintAddress}
+                  </a>
+                </motion.div>
               </div>
             </motion.div>
 

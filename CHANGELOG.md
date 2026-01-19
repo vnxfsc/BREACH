@@ -16,6 +16,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2026-01-20
+
+### Added
+- **$BREACH Token** created on Devnet using SPL Token standard
+  - Mint Address: `CSH2Vz4MbgTLzB9SYJ7gBwNsyu7nKpbvEJzKQLgmmjt4`
+  - Total Supply: 1,000,000,000 BREACH
+  - Decimals: 9 (same as SOL)
+- Token creation script (`create-breach-token.sh`)
+- Token metadata script (`add-token-metadata.ts`)
+
+### Token Allocation
+| Category | Percentage | Amount |
+|----------|------------|--------|
+| Play-to-Earn | 35% | 350,000,000 |
+| Ecosystem | 25% | 250,000,000 |
+| Team (Vested) | 15% | 150,000,000 |
+| Treasury | 10% | 100,000,000 |
+| Liquidity | 10% | 100,000,000 |
+| Advisors | 5% | 50,000,000 |
+
+---
+
 ## [0.3.0] - 2026-01-20
 
 ### Added

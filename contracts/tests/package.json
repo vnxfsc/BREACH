@@ -5,6 +5,7 @@
     "test": "npx ts-node test-titan.ts"
   },
   "dependencies": {
+    "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
     "@solana/web3.js": "^1.95.0",
     "bn.js": "^5.2.1"
   },
