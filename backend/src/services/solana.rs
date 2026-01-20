@@ -934,6 +934,692 @@ impl SolanaService {
             signature: signature.to_string(),
         })
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Titan 操作（Level Up, Evolve, Fuse, Transfer）
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// 构建 Level Up 交易
+    /// 
+    /// 消耗经验值升级 Titan
+    pub async fn build_level_up_transaction(
+        &self,
+        player_wallet: &str,
+        titan_id: u64,
+    ) -> ApiResult<SimpleTransactionResult> {
+        let player = Pubkey::from_str(player_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
+
+        // Derive Titan PDA
+        let titan_id_bytes = titan_id.to_le_bytes();
+        let (titan_pda, _) = Pubkey::find_program_address(
+            &[b"titan", &titan_id_bytes],
+            &self.titan_program_id,
+        );
+
+        // 构建指令 (discriminator = 2)
+        let instruction_data = vec![2u8]; // LEVEL_UP
+
+        let accounts = vec![
+            AccountMeta::new(player, true),       // [0] owner (signer)
+            AccountMeta::new(titan_pda, false),   // [1] titan_account
+        ];
+
+        let instruction = Instruction {
+            program_id: self.titan_program_id,
+            accounts,
+            data: instruction_data,
+        };
+
+        self.build_simple_transaction(&player, instruction).await
+    }
+
+    /// 构建 Evolve 交易
+    /// 
+    /// 进化 Titan 到更高形态（需要等级 >= 30）
+    pub async fn build_evolve_transaction(
+        &self,
+        player_wallet: &str,
+        titan_id: u64,
+        new_species_id: u16,
+    ) -> ApiResult<SimpleTransactionResult> {
+        let player = Pubkey::from_str(player_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
+
+        // Derive Titan PDA
+        let titan_id_bytes = titan_id.to_le_bytes();
+        let (titan_pda, _) = Pubkey::find_program_address(
+            &[b"titan", &titan_id_bytes],
+            &self.titan_program_id,
+        );
+
+        // 构建指令 (discriminator = 3 + EvolveData)
+        let mut instruction_data = vec![3u8]; // EVOLVE
+        instruction_data.extend(new_species_id.to_le_bytes());
+
+        let accounts = vec![
+            AccountMeta::new(player, true),       // [0] owner (signer)
+            AccountMeta::new(titan_pda, false),   // [1] titan_account
+        ];
+
+        let instruction = Instruction {
+            program_id: self.titan_program_id,
+            accounts,
+            data: instruction_data,
+        };
+
+        self.build_simple_transaction(&player, instruction).await
+    }
+
+    /// 构建 Fuse 交易
+    /// 
+    /// 融合两个 Titan 创建新的（需要同元素，等级 >= 20）
+    pub async fn build_fuse_transaction(
+        &self,
+        player_wallet: &str,
+        titan_a_id: u64,
+        titan_b_id: u64,
+    ) -> ApiResult<FuseTransactionResult> {
+        let player = Pubkey::from_str(player_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
+
+        // 获取 config
+        let (config_pda, _) = Pubkey::find_program_address(
+            &[b"config"],
+            &self.titan_program_id,
+        );
+
+        // 读取 config 获取下一个 titan_id
+        let config_account = self.rpc_client.get_account(&config_pda).await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get config: {}", e)))?;
+        
+        let total_minted = if config_account.data.len() >= 158 {
+            u64::from_le_bytes(config_account.data[150..158].try_into().unwrap_or([0u8; 8]))
+        } else {
+            0
+        };
+        let offspring_id = total_minted + 1;
+
+        // Derive PDAs
+        let titan_a_bytes = titan_a_id.to_le_bytes();
+        let (titan_a_pda, _) = Pubkey::find_program_address(
+            &[b"titan", &titan_a_bytes],
+            &self.titan_program_id,
+        );
+
+        let titan_b_bytes = titan_b_id.to_le_bytes();
+        let (titan_b_pda, _) = Pubkey::find_program_address(
+            &[b"titan", &titan_b_bytes],
+            &self.titan_program_id,
+        );
+
+        let offspring_bytes = offspring_id.to_le_bytes();
+        let (offspring_pda, _) = Pubkey::find_program_address(
+            &[b"titan", &offspring_bytes],
+            &self.titan_program_id,
+        );
+
+        // 构建指令 (discriminator = 4)
+        let instruction_data = vec![4u8]; // FUSE
+
+        let accounts = vec![
+            AccountMeta::new(player, true),                        // [0] owner (signer)
+            AccountMeta::new(config_pda, false),                   // [1] config_account
+            AccountMeta::new(titan_a_pda, false),                  // [2] titan_a
+            AccountMeta::new(titan_b_pda, false),                  // [3] titan_b
+            AccountMeta::new(offspring_pda, false),                // [4] offspring
+            AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),   // [5] system_program
+        ];
+
+        let instruction = Instruction {
+            program_id: self.titan_program_id,
+            accounts,
+            data: instruction_data,
+        };
+
+        let result = self.build_simple_transaction(&player, instruction).await?;
+
+        Ok(FuseTransactionResult {
+            serialized_transaction: result.serialized_transaction,
+            message_to_sign: result.message_to_sign,
+            recent_blockhash: result.recent_blockhash,
+            offspring_id,
+            offspring_pda: offspring_pda.to_string(),
+        })
+    }
+
+    /// 构建 Transfer 交易
+    /// 
+    /// 转移 Titan 所有权给另一个玩家
+    pub async fn build_transfer_transaction(
+        &self,
+        from_wallet: &str,
+        to_wallet: &str,
+        titan_id: u64,
+    ) -> ApiResult<SimpleTransactionResult> {
+        let from_owner = Pubkey::from_str(from_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid from wallet: {}", e)))?;
+        let to_owner = Pubkey::from_str(to_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid to wallet: {}", e)))?;
+
+        // 获取 config
+        let (config_pda, _) = Pubkey::find_program_address(
+            &[b"config"],
+            &self.titan_program_id,
+        );
+
+        // Derive Titan PDA
+        let titan_id_bytes = titan_id.to_le_bytes();
+        let (titan_pda, _) = Pubkey::find_program_address(
+            &[b"titan", &titan_id_bytes],
+            &self.titan_program_id,
+        );
+
+        // Derive Player PDAs
+        let (from_player_pda, _) = Pubkey::find_program_address(
+            &[b"player", from_owner.as_ref()],
+            &self.titan_program_id,
+        );
+        let (to_player_pda, _) = Pubkey::find_program_address(
+            &[b"player", to_owner.as_ref()],
+            &self.titan_program_id,
+        );
+
+        // 构建指令 (discriminator = 5)
+        let instruction_data = vec![5u8]; // TRANSFER
+
+        let accounts = vec![
+            AccountMeta::new(from_owner, true),       // [0] from_owner (signer)
+            AccountMeta::new_readonly(to_owner, false), // [1] to_owner
+            AccountMeta::new_readonly(config_pda, false), // [2] config
+            AccountMeta::new(titan_pda, false),       // [3] titan
+            AccountMeta::new(from_player_pda, false), // [4] from_player
+            AccountMeta::new(to_player_pda, false),   // [5] to_player
+        ];
+
+        let instruction = Instruction {
+            program_id: self.titan_program_id,
+            accounts,
+            data: instruction_data,
+        };
+
+        self.build_simple_transaction(&from_owner, instruction).await
+    }
+
+    /// 通用交易构建辅助函数
+    async fn build_simple_transaction(
+        &self,
+        payer: &Pubkey,
+        instruction: Instruction,
+    ) -> ApiResult<SimpleTransactionResult> {
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+        use solana_sdk::message::Message;
+
+        let recent_blockhash = self.rpc_client.get_latest_blockhash().await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get blockhash: {}", e)))?;
+
+        let message = Message::new_with_blockhash(
+            &[instruction],
+            Some(payer),
+            &recent_blockhash,
+        );
+
+        let mut transaction = Transaction::new_unsigned(message);
+        let num_signers = transaction.message.header.num_required_signatures as usize;
+        transaction.signatures = vec![solana_sdk::signature::Signature::default(); num_signers];
+
+        let serialized_tx = bincode::serialize(&transaction)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to serialize: {}", e)))?;
+        
+        let message_to_sign = transaction.message.serialize();
+
+        Ok(SimpleTransactionResult {
+            serialized_transaction: BASE64.encode(&serialized_tx),
+            message_to_sign: BASE64.encode(&message_to_sign),
+            recent_blockhash: recent_blockhash.to_string(),
+        })
+    }
+
+    /// 提交只需用户签名的交易（Level Up, Evolve, Transfer 等）
+    pub async fn submit_user_signed_transaction(
+        &self,
+        serialized_transaction: &str,
+        user_signature: &str,
+        user_wallet: &str,
+    ) -> ApiResult<SubmitTransactionResult> {
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+        use solana_sdk::signature::Signature;
+        
+        let user = Pubkey::from_str(user_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid user wallet: {}", e)))?;
+
+        // 解码交易
+        let tx_bytes = BASE64.decode(serialized_transaction)
+            .map_err(|e| AppError::BadRequest(format!("Invalid base64 transaction: {}", e)))?;
+        
+        let mut transaction: Transaction = bincode::deserialize(&tx_bytes)
+            .map_err(|e| AppError::BadRequest(format!("Invalid transaction format: {}", e)))?;
+
+        // 解码用户签名
+        let sig_bytes = BASE64.decode(user_signature)
+            .map_err(|e| AppError::BadRequest(format!("Invalid base64 signature: {}", e)))?;
+        
+        if sig_bytes.len() != 64 {
+            return Err(AppError::BadRequest("Invalid signature length".to_string()));
+        }
+        
+        let user_sig = Signature::try_from(sig_bytes.as_slice())
+            .map_err(|e| AppError::BadRequest(format!("Invalid signature: {}", e)))?;
+
+        // 验证签名
+        let message_bytes = transaction.message.serialize();
+        if !user_sig.verify(user.as_ref(), &message_bytes) {
+            return Err(AppError::BadRequest("Invalid user signature".to_string()));
+        }
+
+        // 设置签名（用户是唯一签名者）
+        if !transaction.signatures.is_empty() {
+            transaction.signatures[0] = user_sig;
+        }
+
+        // 发送交易
+        let signature = self.rpc_client.send_and_confirm_transaction(&transaction).await
+            .map_err(|e| {
+                tracing::error!("Transaction failed: {:?}", e);
+                AppError::Internal(anyhow::anyhow!("Transaction failed: {}", e))
+            })?;
+
+        Ok(SubmitTransactionResult {
+            signature: signature.to_string(),
+        })
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Game Logic 操作（Record Capture, Record Battle, Add Experience）
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// 记录捕获到链上
+    /// 
+    /// 需要玩家和后端双签名
+    pub async fn record_capture_onchain(
+        &self,
+        player_wallet: &str,
+        titan_id: u64,
+        location_lat: i32,
+        location_lng: i32,
+        threat_class: u8,
+        element_type: u8,
+    ) -> ApiResult<RecordCaptureResult> {
+        let backend_keypair = &self.backend_keypair;
+
+        let player = Pubkey::from_str(player_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
+
+        // 获取 game config
+        let (game_config_pda, _) = Pubkey::find_program_address(
+            &[b"game_config"],
+            &self.game_program_id,
+        );
+
+        // 读取 config 获取 total_captures
+        let config_account = self.rpc_client.get_account(&game_config_pda).await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get game config: {}", e)))?;
+        
+        // total_captures 在 offset 220 处 (228 - 8)
+        let total_captures = if config_account.data.len() >= 228 {
+            u64::from_le_bytes(config_account.data[212..220].try_into().unwrap_or([0u8; 8]))
+        } else {
+            0
+        };
+        let capture_id = total_captures + 1;
+
+        // Derive capture record PDA
+        let capture_id_bytes = capture_id.to_le_bytes();
+        let (capture_record_pda, _) = Pubkey::find_program_address(
+            &[b"capture", &capture_id_bytes],
+            &self.game_program_id,
+        );
+
+        // 构建指令数据 (discriminator = 1)
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let mut instruction_data = vec![1u8]; // RECORD_CAPTURE
+        instruction_data.extend(titan_id.to_le_bytes());
+        instruction_data.extend(location_lat.to_le_bytes());
+        instruction_data.extend(location_lng.to_le_bytes());
+        instruction_data.push(threat_class);
+        instruction_data.push(element_type);
+        instruction_data.extend(timestamp.to_le_bytes());
+
+        let accounts = vec![
+            AccountMeta::new(player, true),                        // [0] player (signer)
+            AccountMeta::new_readonly(backend_keypair.pubkey(), true), // [1] backend_authority (signer)
+            AccountMeta::new(game_config_pda, false),              // [2] config
+            AccountMeta::new(capture_record_pda, false),           // [3] capture_record
+            AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),   // [4] system_program
+        ];
+
+        let instruction = Instruction {
+            program_id: self.game_program_id,
+            accounts,
+            data: instruction_data,
+        };
+
+        // 构建双签名交易
+        let result = self.build_dual_signed_transaction(&player, instruction).await?;
+
+        Ok(RecordCaptureResult {
+            serialized_transaction: result.serialized_transaction,
+            message_to_sign: result.message_to_sign,
+            recent_blockhash: result.recent_blockhash,
+            capture_id,
+            capture_record_pda: capture_record_pda.to_string(),
+        })
+    }
+
+    /// 记录战斗到链上
+    /// 
+    /// 需要玩家A和后端双签名
+    pub async fn record_battle_onchain(
+        &self,
+        player_a_wallet: &str,
+        player_b_wallet: &str,
+        titan_a_id: u64,
+        titan_b_id: u64,
+        winner: u8,
+        exp_gained_a: u32,
+        exp_gained_b: u32,
+        location_lat: i32,
+        location_lng: i32,
+    ) -> ApiResult<RecordBattleResult> {
+        let backend_keypair = &self.backend_keypair;
+
+        let player_a = Pubkey::from_str(player_a_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player A wallet: {}", e)))?;
+        let player_b = Pubkey::from_str(player_b_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player B wallet: {}", e)))?;
+
+        // 获取 game config
+        let (game_config_pda, _) = Pubkey::find_program_address(
+            &[b"game_config"],
+            &self.game_program_id,
+        );
+
+        // 读取 config 获取 total_battles
+        let config_account = self.rpc_client.get_account(&game_config_pda).await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get game config: {}", e)))?;
+        
+        // total_battles 在 offset 204 处
+        let total_battles = if config_account.data.len() >= 228 {
+            u64::from_le_bytes(config_account.data[204..212].try_into().unwrap_or([0u8; 8]))
+        } else {
+            0
+        };
+        let battle_id = total_battles + 1;
+
+        // Derive battle record PDA
+        let battle_id_bytes = battle_id.to_le_bytes();
+        let (battle_record_pda, _) = Pubkey::find_program_address(
+            &[b"battle", &battle_id_bytes],
+            &self.game_program_id,
+        );
+
+        // 构建指令数据 (discriminator = 2)
+        let mut instruction_data = vec![2u8]; // RECORD_BATTLE
+        instruction_data.extend(titan_a_id.to_le_bytes());
+        instruction_data.extend(titan_b_id.to_le_bytes());
+        instruction_data.push(winner);
+        instruction_data.extend(exp_gained_a.to_le_bytes());
+        instruction_data.extend(exp_gained_b.to_le_bytes());
+        instruction_data.extend(location_lat.to_le_bytes());
+        instruction_data.extend(location_lng.to_le_bytes());
+
+        let accounts = vec![
+            AccountMeta::new(player_a, true),                      // [0] player_a (signer)
+            AccountMeta::new_readonly(player_b, false),            // [1] player_b
+            AccountMeta::new_readonly(backend_keypair.pubkey(), true), // [2] backend_authority (signer)
+            AccountMeta::new(game_config_pda, false),              // [3] config
+            AccountMeta::new(battle_record_pda, false),            // [4] battle_record
+            AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),   // [5] system_program
+        ];
+
+        let instruction = Instruction {
+            program_id: self.game_program_id,
+            accounts,
+            data: instruction_data,
+        };
+
+        // 构建双签名交易
+        let result = self.build_dual_signed_transaction(&player_a, instruction).await?;
+
+        Ok(RecordBattleResult {
+            serialized_transaction: result.serialized_transaction,
+            message_to_sign: result.message_to_sign,
+            recent_blockhash: result.recent_blockhash,
+            battle_id,
+            battle_record_pda: battle_record_pda.to_string(),
+        })
+    }
+
+    /// 添加经验值到 Titan
+    /// 
+    /// 通过 game_logic 合约 CPI 调用 titan_nft 的 add_experience
+    pub async fn add_experience_onchain(
+        &self,
+        player_wallet: &str,
+        titan_id: u64,
+        exp_amount: u32,
+    ) -> ApiResult<AddExperienceResult> {
+        let backend_keypair = &self.backend_keypair;
+
+        let player = Pubkey::from_str(player_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
+
+        // 获取 game config
+        let (game_config_pda, _) = Pubkey::find_program_address(
+            &[b"game_config"],
+            &self.game_program_id,
+        );
+
+        // 获取 titan config
+        let (titan_config_pda, _) = Pubkey::find_program_address(
+            &[b"config"],
+            &self.titan_program_id,
+        );
+
+        // 获取 titan PDA
+        let titan_id_bytes = titan_id.to_le_bytes();
+        let (titan_pda, _) = Pubkey::find_program_address(
+            &[b"titan", &titan_id_bytes],
+            &self.titan_program_id,
+        );
+
+        // 构建指令数据 (discriminator = 3)
+        let mut instruction_data = vec![3u8]; // ADD_EXPERIENCE
+        instruction_data.extend(titan_id.to_le_bytes());
+        instruction_data.extend(exp_amount.to_le_bytes());
+
+        let accounts = vec![
+            AccountMeta::new(player, true),                        // [0] player (signer)
+            AccountMeta::new_readonly(backend_keypair.pubkey(), true), // [1] backend_authority (signer)
+            AccountMeta::new(game_config_pda, false),              // [2] game_config
+            AccountMeta::new(titan_pda, false),                    // [3] titan
+            AccountMeta::new_readonly(titan_config_pda, false),    // [4] titan_config
+            AccountMeta::new_readonly(self.titan_program_id, false), // [5] titan_program
+        ];
+
+        let instruction = Instruction {
+            program_id: self.game_program_id,
+            accounts,
+            data: instruction_data,
+        };
+
+        // 构建双签名交易
+        let result = self.build_dual_signed_transaction(&player, instruction).await?;
+
+        Ok(AddExperienceResult {
+            serialized_transaction: result.serialized_transaction,
+            message_to_sign: result.message_to_sign,
+            recent_blockhash: result.recent_blockhash,
+            titan_id,
+            exp_amount,
+        })
+    }
+
+    /// 构建需要双签名的交易（玩家 + 后端）
+    async fn build_dual_signed_transaction(
+        &self,
+        payer: &Pubkey,
+        instruction: Instruction,
+    ) -> ApiResult<SimpleTransactionResult> {
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+        use solana_sdk::message::Message;
+
+        let recent_blockhash = self.rpc_client.get_latest_blockhash().await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get blockhash: {}", e)))?;
+
+        let message = Message::new_with_blockhash(
+            &[instruction],
+            Some(payer),
+            &recent_blockhash,
+        );
+
+        let mut transaction = Transaction::new_unsigned(message);
+        let num_signers = transaction.message.header.num_required_signatures as usize;
+        transaction.signatures = vec![solana_sdk::signature::Signature::default(); num_signers];
+
+        let serialized_tx = bincode::serialize(&transaction)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to serialize: {}", e)))?;
+        
+        let message_to_sign = transaction.message.serialize();
+
+        Ok(SimpleTransactionResult {
+            serialized_transaction: BASE64.encode(&serialized_tx),
+            message_to_sign: BASE64.encode(&message_to_sign),
+            recent_blockhash: recent_blockhash.to_string(),
+        })
+    }
+
+    /// 提交双签名交易（玩家签名 + 后端签名）
+    pub async fn submit_dual_signed_transaction(
+        &self,
+        serialized_transaction: &str,
+        player_signature: &str,
+        player_wallet: &str,
+    ) -> ApiResult<SubmitTransactionResult> {
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+        use solana_sdk::signature::Signature;
+
+        let backend_keypair = &self.backend_keypair;
+        
+        let player = Pubkey::from_str(player_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
+
+        // 解码交易
+        let tx_bytes = BASE64.decode(serialized_transaction)
+            .map_err(|e| AppError::BadRequest(format!("Invalid base64 transaction: {}", e)))?;
+        
+        let mut transaction: Transaction = bincode::deserialize(&tx_bytes)
+            .map_err(|e| AppError::BadRequest(format!("Invalid transaction format: {}", e)))?;
+
+        // 解码玩家签名
+        let player_sig_bytes = BASE64.decode(player_signature)
+            .map_err(|e| AppError::BadRequest(format!("Invalid base64 signature: {}", e)))?;
+        
+        if player_sig_bytes.len() != 64 {
+            return Err(AppError::BadRequest("Invalid signature length".to_string()));
+        }
+        
+        let player_sig = Signature::try_from(player_sig_bytes.as_slice())
+            .map_err(|e| AppError::BadRequest(format!("Invalid signature: {}", e)))?;
+
+        // 验证玩家签名
+        let message_bytes = transaction.message.serialize();
+        if !player_sig.verify(player.as_ref(), &message_bytes) {
+            return Err(AppError::BadRequest("Invalid player signature".to_string()));
+        }
+
+        // 后端签名
+        let backend_sig = backend_keypair.sign_message(&message_bytes);
+
+        // 设置签名（玩家是第一个签名者，后端是第二个）
+        // 签名顺序由 account_keys 中的顺序决定
+        let account_keys = &transaction.message.account_keys;
+        for (i, key) in account_keys.iter().enumerate() {
+            if i >= transaction.signatures.len() {
+                break;
+            }
+            if *key == player {
+                transaction.signatures[i] = player_sig;
+            } else if *key == backend_keypair.pubkey() {
+                transaction.signatures[i] = backend_sig;
+            }
+        }
+
+        tracing::info!("Submitting dual-signed transaction");
+
+        // 发送交易
+        let signature = self.rpc_client.send_and_confirm_transaction(&transaction).await
+            .map_err(|e| {
+                tracing::error!("Transaction failed: {:?}", e);
+                AppError::Internal(anyhow::anyhow!("Transaction failed: {}", e))
+            })?;
+
+        Ok(SubmitTransactionResult {
+            signature: signature.to_string(),
+        })
+    }
+}
+
+/// Record Capture 结果
+#[derive(Debug, Clone, Serialize)]
+pub struct RecordCaptureResult {
+    pub serialized_transaction: String,
+    pub message_to_sign: String,
+    pub recent_blockhash: String,
+    pub capture_id: u64,
+    pub capture_record_pda: String,
+}
+
+/// Record Battle 结果
+#[derive(Debug, Clone, Serialize)]
+pub struct RecordBattleResult {
+    pub serialized_transaction: String,
+    pub message_to_sign: String,
+    pub recent_blockhash: String,
+    pub battle_id: u64,
+    pub battle_record_pda: String,
+}
+
+/// Add Experience 结果
+#[derive(Debug, Clone, Serialize)]
+pub struct AddExperienceResult {
+    pub serialized_transaction: String,
+    pub message_to_sign: String,
+    pub recent_blockhash: String,
+    pub titan_id: u64,
+    pub exp_amount: u32,
+}
+
+/// 简单交易结果（只需用户签名）
+#[derive(Debug, Clone, Serialize)]
+pub struct SimpleTransactionResult {
+    pub serialized_transaction: String,
+    pub message_to_sign: String,
+    pub recent_blockhash: String,
+}
+
+/// Fuse 交易结果
+#[derive(Debug, Clone, Serialize)]
+pub struct FuseTransactionResult {
+    pub serialized_transaction: String,
+    pub message_to_sign: String,
+    pub recent_blockhash: String,
+    pub offspring_id: u64,
+    pub offspring_pda: String,
 }
 
 /// 构建交易的返回结果
