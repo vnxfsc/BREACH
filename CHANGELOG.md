@@ -14,6 +14,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AR capture system integration
 - Mainnet deployment
 - Initialize Game Logic reward pool for on-chain reward distribution
+- Implement on-chain escrow for marketplace (required for trustless trading)
+
+---
+
+## [0.8.1] - 2026-01-20
+
+### Added - Marketplace Integration (Partial)
+
+#### Marketplace Query APIs
+Marketplace listing query functionality is fully implemented (off-chain):
+- `GET /api/v1/marketplace` - Search marketplace listings (supports filters: element, threat class, price range, etc.)
+- `GET /api/v1/marketplace/listings/:id` - Get listing details
+- `GET /api/v1/marketplace/my-listings` - Get listings created by the current player
+- `GET /api/v1/marketplace/stats` - Marketplace statistics
+
+#### On-chain Purchase API (Demonstrational)
+- `POST /api/v1/marketplace/listings/:id/purchase/build` - Build on-chain purchase transaction
+  - Validate listing status
+  - Calculate platform fee (2.5%)
+  - Build Titan Transfer instruction for NFT ownership transfer
+  - Return unsigned transaction + `message_to_sign`
+
+#### Known Limitations
+
+**On-chain purchases are not yet trustless** – an escrow contract is required:
+
+The current Titan NFT `transfer` instruction requires the **seller signature** (`from_owner`), which the buyer cannot provide.
+
+A fully decentralized marketplace requires:
+1. **Escrow Program**: Seller deposits the NFT into an escrow PDA when creating a listing
+2. **Purchase Instruction**: Buyer payment triggers NFT release from escrow to buyer (and funds to seller)
+3. Or an **approval/authority model** similar to ERC721 `approve`
+
+**Current Workaround**:
+- Use the off-chain marketplace (current implementation) with database records and manual/assisted transfers
+- Coordinate P2P transfers via chat or off-chain agreements
+
+#### Test Scripts
+- `contracts/tests/test-marketplace.ts` - Marketplace query integration test
+
+#### Technical Details
+- Marketplace listings are stored in PostgreSQL
+- Supports both fixed-price and auction-style listings
+- Platform fee: 2.5% (250 basis points)
+- Default listing duration: 72 hours
+
+### Files Changed
+- `backend/src/api/marketplace.rs` - Added on-chain purchase build endpoint
+- `backend/src/models/marketplace.rs` - Added `PurchaseTransactionResponse` model
+- `contracts/tests/test-marketplace.ts` - Added marketplace test script
 
 ---
 

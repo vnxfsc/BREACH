@@ -1,6 +1,6 @@
-//! Game Logic 链上操作 API
+//! Game Logic on-chain operations API
 //!
-//! 提供捕获记录、战斗记录、经验值添加等链上操作
+//! Provides capture records, battle records, and experience distribution operations.
 
 use std::sync::Arc;
 
@@ -17,15 +17,15 @@ use crate::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct RecordCaptureRequest {
-    /// 链上 Titan ID
+    /// On-chain Titan ID
     pub titan_id: u64,
-    /// 捕获位置纬度 (*1e6)
+    /// Capture latitude (*1e6)
     pub location_lat: i32,
-    /// 捕获位置经度 (*1e6)
+    /// Capture longitude (*1e6)
     pub location_lng: i32,
-    /// 威胁等级 (1-5)
+    /// Threat class (1-5)
     pub threat_class: u8,
-    /// 元素类型 (0-5)
+    /// Element type (0-5)
     pub element_type: u8,
 }
 
@@ -38,7 +38,7 @@ pub struct RecordCaptureResponse {
     pub capture_record_pda: String,
 }
 
-/// 构建 Record Capture 交易
+/// Build Record Capture transaction
 async fn build_record_capture(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
@@ -71,21 +71,21 @@ async fn build_record_capture(
 
 #[derive(Debug, Deserialize)]
 pub struct RecordBattleRequest {
-    /// 对手钱包地址
+    /// Opponent wallet address
     pub opponent_wallet: String,
-    /// 玩家的 Titan ID
+    /// Player's Titan on-chain ID
     pub titan_id: u64,
-    /// 对手的 Titan ID
+    /// Opponent's Titan on-chain ID
     pub opponent_titan_id: u64,
-    /// 获胜者 (0 = 玩家, 1 = 对手, 2 = 平局)
+    /// Winner (0 = player, 1 = opponent, 2 = draw)
     pub winner: u8,
-    /// 玩家 Titan 获得的经验
+    /// Experience gained by player's Titan
     pub exp_gained: u32,
-    /// 对手 Titan 获得的经验
+    /// Experience gained by opponent's Titan
     pub opponent_exp_gained: u32,
-    /// 战斗位置纬度 (*1e6)
+    /// Battle latitude (*1e6)
     pub location_lat: i32,
-    /// 战斗位置经度 (*1e6)
+    /// Battle longitude (*1e6)
     pub location_lng: i32,
 }
 
@@ -98,7 +98,7 @@ pub struct RecordBattleResponse {
     pub battle_record_pda: String,
 }
 
-/// 构建 Record Battle 交易
+/// Build Record Battle transaction
 async fn build_record_battle(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
@@ -134,9 +134,9 @@ async fn build_record_battle(
 
 #[derive(Debug, Deserialize)]
 pub struct AddExperienceRequest {
-    /// 链上 Titan ID
+    /// On-chain Titan ID
     pub titan_id: u64,
-    /// 要添加的经验值
+    /// Amount of experience to add
     pub exp_amount: u32,
 }
 
@@ -149,7 +149,7 @@ pub struct AddExperienceResponse {
     pub exp_amount: u32,
 }
 
-/// 构建 Add Experience 交易
+/// Build Add Experience transaction
 async fn build_add_experience(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
@@ -179,9 +179,9 @@ async fn build_add_experience(
 
 #[derive(Debug, Deserialize)]
 pub struct DistributeRewardRequest {
-    /// 奖励类型 (0=capture, 1=battle_win, 2=daily_bonus)
+    /// Reward type (0=capture, 1=battle_win, 2=daily_bonus)
     pub reward_type: u8,
-    /// 基础金额（lamports）
+    /// Base amount (in lamports)
     pub amount: u64,
 }
 
@@ -193,10 +193,10 @@ pub struct DistributeRewardResponse {
     pub reward_type: u8,
 }
 
-/// 分发 BREACH 代币奖励（后端直接转账）
-/// 
-/// 注意：当前使用后端直接转账而非链上 game_logic 合约
-/// 因为 reward pool 尚未初始化
+/// Distribute BREACH token rewards (backend direct transfer).
+///
+/// Note: currently uses direct backend transfers instead of the on-chain `game_logic` contract
+/// because the reward pool account is not yet initialized.
 async fn distribute_reward(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
@@ -205,17 +205,17 @@ async fn distribute_reward(
     let solana = state.services.solana.as_ref()
         .ok_or(AppError::Internal(anyhow::anyhow!("Solana service not available")))?;
 
-    // 验证奖励类型
+    // Validate reward type
     if request.reward_type > 2 {
         return Err(AppError::BadRequest("Invalid reward type".to_string()));
     }
 
-    // 验证金额
+    // Validate amount
     if request.amount == 0 {
         return Err(AppError::BadRequest("Amount must be greater than 0".to_string()));
     }
 
-    // 计算奖励倍数（与合约逻辑保持一致）
+    // Calculate reward multiplier (must match on-chain logic)
     let multiplier = match request.reward_type {
         0 => 1,  // Capture
         1 => 2,  // Battle Win (2x)
@@ -224,7 +224,7 @@ async fn distribute_reward(
     };
     let final_amount = request.amount * multiplier;
 
-    // 直接使用 transfer_breach_tokens（绕过链上 distribute_reward）
+    // Use transfer_breach_tokens directly (bypassing on-chain `distribute_reward`)
     let result = solana.transfer_breach_tokens(
         &player.wallet_address,
         final_amount,
@@ -233,20 +233,20 @@ async fn distribute_reward(
     Ok(Json(DistributeRewardResponse {
         success: true,
         tx_signature: result.signature,
-        amount: final_amount,  // 返回实际分发的金额（已应用倍数）
+        amount: final_amount,  // Actual amount distributed (after applying multiplier)
         reward_type: request.reward_type,
     }))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 提交双签名交易 API
+// Submit dual-signed transaction API
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Deserialize)]
 pub struct SubmitDualSignedRequest {
-    /// Base64 编码的交易
+    /// Base64-encoded serialized transaction
     pub serialized_transaction: String,
-    /// Base64 编码的玩家签名
+    /// Base64-encoded player signature
     pub player_signature: String,
 }
 
@@ -256,7 +256,7 @@ pub struct SubmitDualSignedResponse {
     pub tx_signature: String,
 }
 
-/// 提交双签名交易（玩家 + 后端）
+/// Submit dual-signed transaction (player + backend)
 async fn submit_dual_signed(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
@@ -278,18 +278,18 @@ async fn submit_dual_signed(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 路由
+// Routes
 // ═══════════════════════════════════════════════════════════════════════════════
 
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
-        // 构建交易端点
+        // Build transaction endpoints
         .route("/game/capture/build", post(build_record_capture))
         .route("/game/battle/build", post(build_record_battle))
         .route("/game/experience/build", post(build_add_experience))
-        // 提交交易端点
+        // Submit transaction endpoint
         .route("/game/submit", post(submit_dual_signed))
-        // 奖励分发端点
+        // Reward distribution endpoint
         .route("/game/reward/distribute", post(distribute_reward))
         .with_state(state)
 }

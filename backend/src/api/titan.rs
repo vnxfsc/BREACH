@@ -1,6 +1,6 @@
-//! Titan 操作 API
+//! Titan operations API
 //!
-//! 提供 Titan 的链上操作：升级、进化、融合、转移
+//! Provides on-chain Titan operations: level up, evolve, fuse, transfer.
 
 use std::sync::Arc;
 
@@ -17,7 +17,7 @@ use crate::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct LevelUpRequest {
-    /// 链上 Titan ID
+    /// On-chain Titan ID
     pub titan_id: u64,
 }
 
@@ -28,7 +28,7 @@ pub struct BuildTransactionResponse {
     pub recent_blockhash: String,
 }
 
-/// 构建 Level Up 交易
+/// Build Level Up transaction
 async fn build_level_up(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
@@ -55,13 +55,13 @@ async fn build_level_up(
 
 #[derive(Debug, Deserialize)]
 pub struct EvolveRequest {
-    /// 链上 Titan ID
+    /// On-chain Titan ID
     pub titan_id: u64,
-    /// 新的物种 ID
+    /// New species ID after evolution
     pub new_species_id: u16,
 }
 
-/// 构建 Evolve 交易
+/// Build Evolve transaction
 async fn build_evolve(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
@@ -89,9 +89,9 @@ async fn build_evolve(
 
 #[derive(Debug, Deserialize)]
 pub struct FuseRequest {
-    /// 第一个 Titan 的链上 ID
+    /// First Titan on-chain ID
     pub titan_a_id: u64,
-    /// 第二个 Titan 的链上 ID
+    /// Second Titan on-chain ID
     pub titan_b_id: u64,
 }
 
@@ -100,13 +100,13 @@ pub struct FuseTransactionResponse {
     pub serialized_transaction: String,
     pub message_to_sign: String,
     pub recent_blockhash: String,
-    /// 新生成的 Titan ID
+    /// Newly created Titan ID
     pub offspring_id: u64,
-    /// 新 Titan 的 PDA 地址
+    /// New Titan PDA address
     pub offspring_pda: String,
 }
 
-/// 构建 Fuse 交易
+/// Build Fuse transaction
 async fn build_fuse(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
@@ -136,13 +136,13 @@ async fn build_fuse(
 
 #[derive(Debug, Deserialize)]
 pub struct TransferRequest {
-    /// 链上 Titan ID
+    /// On-chain Titan ID
     pub titan_id: u64,
-    /// 接收者钱包地址
+    /// Recipient wallet address
     pub to_wallet: String,
 }
 
-/// 构建 Transfer 交易
+/// Build Transfer transaction
 async fn build_transfer(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
@@ -165,14 +165,14 @@ async fn build_transfer(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 提交签名交易 API
+// Submit signed transaction API
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Deserialize)]
 pub struct SubmitTransactionRequest {
-    /// Base64 编码的交易
+    /// Base64-encoded serialized transaction
     pub serialized_transaction: String,
-    /// Base64 编码的用户签名
+    /// Base64-encoded user signature
     pub user_signature: String,
 }
 
@@ -182,7 +182,7 @@ pub struct SubmitTransactionResponse {
     pub tx_signature: String,
 }
 
-/// 提交用户签名的交易
+/// Submit user-signed transaction
 async fn submit_transaction(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
@@ -204,17 +204,17 @@ async fn submit_transaction(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 路由
+// Routes
 // ═══════════════════════════════════════════════════════════════════════════════
 
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
-        // 构建交易端点
+        // Build transaction endpoints
         .route("/titan/level-up/build", post(build_level_up))
         .route("/titan/evolve/build", post(build_evolve))
         .route("/titan/fuse/build", post(build_fuse))
         .route("/titan/transfer/build", post(build_transfer))
-        // 提交交易端点
+        // Submit transaction endpoint
         .route("/titan/submit", post(submit_transaction))
         .with_state(state)
 }

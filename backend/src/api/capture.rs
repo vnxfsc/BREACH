@@ -1,8 +1,8 @@
 //! Capture endpoints
 //!
-//! 提供两种铸造模式:
-//! 1. 后端代付模式 (测试用): POST /capture/confirm
-//! 2. 前端签名模式 (生产用): POST /capture/build-transaction + POST /capture/submit-transaction
+//! Provides two minting modes:
+//! 1. Backend-paid mode (testing): POST /capture/confirm
+//! 2. Frontend-signed mode (production): POST /capture/build-transaction + POST /capture/submit-transaction
 
 use std::sync::Arc;
 
@@ -196,40 +196,40 @@ fn calculate_breach_reward(threat_class: i16) -> u64 {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 生产级 API（前端签名流程）
+// Production API (frontend signing flow)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// 构建铸造交易请求
+/// Build mint transaction request.
 #[derive(Debug, Deserialize)]
 pub struct BuildMintTransactionRequest {
-    /// Titan spawn ID (数据库中的 UUID)
+    /// Titan spawn ID (UUID in database).
     pub titan_id: uuid::Uuid,
-    /// 捕捉位置纬度 (度)
+    /// Capture latitude (degrees).
     pub capture_lat: f64,
-    /// 捕捉位置经度 (度)
+    /// Capture longitude (degrees).
     pub capture_lng: f64,
 }
 
-/// 构建铸造交易响应
+/// Build mint transaction response.
 #[derive(Debug, Serialize)]
 pub struct BuildMintTransactionResponse {
-    /// Base64 编码的序列化交易（含空签名槽，bincode 格式）
+    /// Base64-encoded serialized transaction (with empty signature slots, bincode format).
     pub serialized_transaction: String,
-    /// Base64 编码的消息字节（用于前端签名）
+    /// Base64-encoded message bytes (for frontend signing).
     pub message_to_sign: String,
-    /// 最近的 blockhash
+    /// Recent blockhash.
     pub recent_blockhash: String,
-    /// Titan PDA 地址 (NFT 地址)
+    /// Titan PDA address (NFT address).
     pub titan_pda: String,
-    /// Player PDA 地址
+    /// Player PDA address.
     pub player_pda: String,
-    /// 链上 Titan ID
+    /// On-chain Titan ID.
     pub titan_id: u64,
-    /// Titan 信息
+    /// Titan info (for client display).
     pub titan_info: TitanMintInfo,
 }
 
-/// Titan 铸造信息
+/// Titan mint info.
 #[derive(Debug, Serialize)]
 pub struct TitanMintInfo {
     pub species_id: i32,
@@ -237,37 +237,37 @@ pub struct TitanMintInfo {
     pub threat_class: i16,
 }
 
-/// 构建铸造交易
-/// 
-/// 返回未签名的交易消息，供前端钱包签名
+/// Build mint transaction.
+///
+/// Returns an unsigned transaction message for the wallet to sign.
 async fn build_mint_transaction(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
     Json(request): Json<BuildMintTransactionRequest>,
 ) -> ApiResult<Json<BuildMintTransactionResponse>> {
-    // 获取 Titan 信息
+    // Load Titan info.
     let titan = state.services.map.get_titan(request.titan_id).await?
         .ok_or(AppError::TitanNotFound)?;
 
-    // 验证 Titan 可捕捉
+    // Validate Titan can be captured.
     if titan.captured_by.is_some() && titan.capture_count >= titan.max_captures {
         return Err(AppError::TitanAlreadyCaptured);
     }
 
-    // 需要 Solana 服务
+    // Require Solana service.
     let solana = state.services.solana.as_ref()
         .ok_or(AppError::Internal(anyhow::anyhow!("Solana service not available")))?;
 
-    // 转换 genes
+    // Convert genes.
     let mut genes_array = [0u8; 32];
     let len = titan.genes.len().min(32);
     genes_array[..len].copy_from_slice(&titan.genes[..len]);
 
-    // 转换坐标 (度 -> 10^6 整数)
+    // Convert coordinates (degrees -> 10^6 integer).
     let capture_lat = (request.capture_lat * 1_000_000.0) as i32;
     let capture_lng = (request.capture_lng * 1_000_000.0) as i32;
 
-    // 构建交易
+    // Build transaction.
     let result = solana.build_mint_transaction(
         &player.wallet_address,
         titan.element,
@@ -298,57 +298,57 @@ async fn build_mint_transaction(
     }))
 }
 
-/// 提交已签名交易请求
+/// Submit signed transaction request.
 #[derive(Debug, Deserialize)]
 pub struct SubmitSignedTransactionRequest {
-    /// Base64 编码的玩家签名 (64 字节)
+    /// Base64-encoded player signature (64 bytes).
     pub player_signature: String,
-    /// Base64 编码的原始未签名交易
+    /// Base64-encoded original unsigned transaction.
     pub serialized_transaction: String,
-    /// Titan spawn ID (数据库中的 UUID)
+    /// Titan spawn ID (UUID in database).
     pub titan_id: uuid::Uuid,
-    /// Titan PDA 地址 (从 build-transaction 返回)
+    /// Titan PDA address (returned from `build-transaction`).
     pub titan_pda: String,
 }
 
-/// 提交已签名交易响应
+/// Submit signed transaction response.
 #[derive(Debug, Serialize)]
 pub struct SubmitSignedTransactionResponse {
     pub success: bool,
-    /// 交易签名
+    /// Transaction signature.
     pub tx_signature: String,
-    /// Titan PDA (NFT 地址)
+    /// Titan PDA (NFT address).
     pub mint_address: String,
-    /// 剩余捕捉次数
+    /// Remaining captures.
     pub remaining_captures: i32,
-    /// BREACH 奖励金额
+    /// BREACH reward amount.
     pub breach_reward: Option<u64>,
-    /// BREACH 奖励交易签名
+    /// BREACH reward transaction signature.
     pub breach_tx_signature: Option<String>,
 }
 
-/// 提交已签名的铸造交易
-/// 
-/// 接收前端签名后的交易，添加后端签名并广播到链上
+/// Submit a signed mint transaction.
+///
+/// Accepts the frontend-signed transaction, adds backend signature and broadcasts it.
 async fn submit_signed_transaction(
     State(state): State<Arc<AppState>>,
     AuthPlayer(player): AuthPlayer,
     Json(request): Json<SubmitSignedTransactionRequest>,
 ) -> ApiResult<Json<SubmitSignedTransactionResponse>> {
-    // 获取 Titan 信息
+    // Load Titan info.
     let titan = state.services.map.get_titan(request.titan_id).await?
         .ok_or(AppError::TitanNotFound)?;
 
-    // 验证 Titan 可捕捉
+    // Validate Titan can be captured.
     if titan.captured_by.is_some() && titan.capture_count >= titan.max_captures {
         return Err(AppError::TitanAlreadyCaptured);
     }
 
-    // 需要 Solana 服务
+    // Require Solana service.
     let solana = state.services.solana.as_ref()
         .ok_or(AppError::Internal(anyhow::anyhow!("Solana service not available")))?;
 
-    // 提交交易
+    // Submit transaction.
     let result = solana.submit_signed_transaction(
         &request.serialized_transaction,
         &request.player_signature,
@@ -360,7 +360,7 @@ async fn submit_signed_transaction(
         player.wallet_address, result.signature
     );
 
-    // 分发 BREACH 奖励
+    // Distribute BREACH rewards.
     let mut breach_reward = None;
     let mut breach_tx_signature = None;
     
@@ -381,15 +381,15 @@ async fn submit_signed_transaction(
         }
     }
 
-    // 记录捕捉到数据库
+    // Record capture in database.
     state.services.capture
         .confirm_capture(request.titan_id, player.player_id)
         .await?;
 
-    // 计算剩余捕捉次数
+    // Compute remaining captures.
     let remaining_captures = titan.max_captures - titan.capture_count - 1;
 
-    // 广播 WebSocket 事件
+    // Broadcast WebSocket events.
     let message = WsMessage::TitanCaptured {
         titan_id: request.titan_id.to_string(),
         captured_by: player.wallet_address.clone(),
@@ -405,7 +405,7 @@ async fn submit_signed_transaction(
     Ok(Json(SubmitSignedTransactionResponse {
         success: true,
         tx_signature: result.signature,
-        mint_address: request.titan_pda, // 从请求中获取
+        mint_address: request.titan_pda, // From request payload
         remaining_captures,
         breach_reward,
         breach_tx_signature,
@@ -414,11 +414,11 @@ async fn submit_signed_transaction(
 
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
-        // 基础端点
+        // Core endpoints
         .route("/capture/request", post(request_capture))
-        // 测试用端点（后端代付）
+        // Testing endpoint (backend-paid)
         .route("/capture/confirm", post(confirm_capture))
-        // 生产用端点（前端签名）
+        // Production endpoints (frontend-signed)
         .route("/capture/build-transaction", post(build_mint_transaction))
         .route("/capture/submit-transaction", post(submit_signed_transaction))
         .with_state(state)

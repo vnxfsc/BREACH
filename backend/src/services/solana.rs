@@ -26,7 +26,7 @@ use crate::config::SolanaConfig;
 use crate::error::{ApiResult, AppError};
 use crate::models::Element;
 
-/// Solana service for blockchain interactions
+    /// Solana service for blockchain interactions
 #[derive(Clone)]
 pub struct SolanaService {
     config: SolanaConfig,
@@ -37,8 +37,8 @@ pub struct SolanaService {
     breach_token_mint: Pubkey,
 }
 
-/// Titan NFT data for minting (matches contract MintTitanData)
-/// Total size: 88 bytes (packed)
+    /// Titan NFT data for minting (matches contract `MintTitanData`).
+    /// Total size: 88 bytes (packed).
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 pub struct TitanMintData {
@@ -57,7 +57,7 @@ pub struct TitanMintData {
 }
 
 impl TitanMintData {
-    // 序列化为字节数组
+    // Serialize to a byte array
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(88);
         bytes.extend_from_slice(&self.species_id.to_le_bytes());
@@ -111,7 +111,7 @@ pub struct TransferResult {
 }
 
 impl SolanaService {
-    /// Create a new Solana service
+    /// Create a new Solana service.
     pub fn new(config: &SolanaConfig) -> ApiResult<Self> {
         // Parse program IDs
         let titan_program_id = Pubkey::from_str(&config.titan_program_id)
@@ -150,7 +150,7 @@ impl SolanaService {
         })
     }
 
-    /// Create a new Solana service without loading keypair (for testing)
+    /// Create a new Solana service without loading keypair (for testing).
     pub fn new_without_keypair(config: &SolanaConfig) -> ApiResult<Self> {
         let titan_program_id = Pubkey::from_str(&config.titan_program_id)
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Invalid Titan program ID: {}", e)))?;
@@ -179,12 +179,12 @@ impl SolanaService {
         })
     }
 
-    /// Get backend wallet public key
+    /// Get backend wallet public key.
     pub fn backend_pubkey(&self) -> Pubkey {
         self.backend_keypair.pubkey()
     }
 
-    /// Get current SOL balance for an address
+    /// Get current SOL balance for an address.
     pub async fn get_balance(&self, address: &str) -> ApiResult<u64> {
         let pubkey = Pubkey::from_str(address)
             .map_err(|e| AppError::BadRequest(format!("Invalid address: {}", e)))?;
@@ -195,7 +195,7 @@ impl SolanaService {
         Ok(balance)
     }
 
-    /// Get $BREACH token balance for an address
+    /// Get $BREACH token balance for an address.
     pub async fn get_breach_balance(&self, address: &str) -> ApiResult<u64> {
         let owner = Pubkey::from_str(address)
             .map_err(|e| AppError::BadRequest(format!("Invalid address: {}", e)))?;
@@ -211,17 +211,17 @@ impl SolanaService {
         }
     }
 
-    /// Mint a new Titan NFT
-    /// 
+    /// Mint a new Titan NFT.
+    ///
     /// This calls the Titan NFT program to create a new NFT
     /// with the specified attributes.
-    /// 
+    ///
     /// Account layout (must match contract):
-    /// [0] payer - 玩家钱包 (签名者)
-    /// [1] config_account - Config PDA
-    /// [2] player_account - Player PDA  
+    /// [0] payer - player wallet (signer)
+    /// [1] config_account - config PDA
+    /// [2] player_account - player PDA
     /// [3] titan_account - Titan PDA
-    /// [4] capture_authority - 后端钱包 (签名者)
+    /// [4] capture_authority - backend wallet (signer)
     /// [5] system_program
     pub async fn mint_titan_nft(
         &self,
@@ -231,13 +231,14 @@ impl SolanaService {
         species_id: u32,
         genes: [u8; 32],
     ) -> ApiResult<MintResult> {
-        // 注意：当前实现使用后端钱包作为 payer (测试用)
-        // 真正的玩家钱包地址仅作为记录保留
+        // NOTE: current implementation uses the backend wallet as payer (testing only).
+        // The real player wallet address is kept only for record.
         let _player = Pubkey::from_str(player_wallet)
             .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
         
-        // 临时方案：使用后端作为 payer
-        // TODO: 生产环境应修改合约支持 mint_titan_for_player 或使用前端签名
+        // Temporary approach: use backend as payer.
+        // TODO: in production, update the contract to support `mint_titan_for_player`
+        // or use a fully frontend-signed flow.
         let payer = self.backend_keypair.pubkey();
         
         tracing::info!(
@@ -245,13 +246,13 @@ impl SolanaService {
             player_wallet, payer, element, threat_class, species_id
         );
 
-        // 获取当前 config 来确定 titan_id
+        // Load current config to determine titan_id
         let (config_pda, _) = Pubkey::find_program_address(
             &[b"config"],
             &self.titan_program_id,
         );
         
-        // 读取 config 获取 total_titans_minted
+        // Read `total_titans_minted` from config
         let config_account = self.rpc_client.get_account(&config_pda).await
             .map_err(|e| {
                 tracing::error!("Failed to get config account: {}", e);
@@ -260,7 +261,7 @@ impl SolanaService {
         
         tracing::debug!("Config account data length: {}", config_account.data.len());
         
-        // GlobalConfig 布局 (packed, 无填充):
+        // GlobalConfig layout (packed, no padding):
         // - discriminator: [u8; 8] - offset 0-7
         // - authority: Pubkey - offset 8-39
         // - treasury: Pubkey - offset 40-71
@@ -274,7 +275,7 @@ impl SolanaService {
         // - paused: bool - offset 148
         // - bump: u8 - offset 149
         // - total_titans_minted: u64 - offset 150-157
-        // 总大小: 182 bytes
+        // Total size: 182 bytes
         let total_minted = if config_account.data.len() >= 158 {
             u64::from_le_bytes(config_account.data[150..158].try_into().unwrap_or([0u8; 8]))
         } else {
@@ -326,27 +327,28 @@ impl SolanaService {
             velocity,
             resonance,
             genes: genes_6,
-            capture_lat: 35658600,  // 东京纬度 * 10^6
-            capture_lng: 139745200, // 东京经度 * 10^6
+            // Example capture location: Tokyo (lat/lng * 10^6)
+            capture_lat: 35658600,  // Tokyo latitude * 10^6
+            capture_lng: 139745200, // Tokyo longitude * 10^6
             nonce: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
-            signature: [0u8; 64], // 占位符，合约不验证
+            signature: [0u8; 64], // Placeholder signature, not verified on-chain
         };
 
-        // 构建指令数据: discriminator(1) + MintTitanData
+        // Build instruction data: discriminator(1) + MintTitanData
         let mut instruction_data = vec![1u8]; // 1 = mint_titan instruction
         instruction_data.extend(mint_data.to_bytes());
 
-        // 账户列表 (必须匹配合约)
-        // 临时方案：后端既是 payer 又是 capture_authority
+        // Account list (must match contract).
+        // Temporary approach: backend is both payer and capture_authority.
         let accounts = vec![
-            AccountMeta::new(payer, true),                            // [0] payer (后端签名者，临时方案)
+            AccountMeta::new(payer, true),                            // [0] payer (backend signer, temporary)
             AccountMeta::new(config_pda, false),                      // [1] config_account
             AccountMeta::new(player_pda, false),                      // [2] player_account
             AccountMeta::new(titan_pda, false),                       // [3] titan_account
-            AccountMeta::new(self.backend_keypair.pubkey(), true),    // [4] capture_authority (后端签名者)
+            AccountMeta::new(self.backend_keypair.pubkey(), true),    // [4] capture_authority (backend signer)
             AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),      // [5] system_program
         ];
         
@@ -676,16 +678,16 @@ impl SolanaService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 生产级交易构建 API（支持前端签名）
+    // Production-grade transaction building API (supports frontend signing)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// 构建 NFT 铸造交易（未签名）
-    /// 
-    /// 返回序列化的交易，供前端签名
-    /// 流程：
-    /// 1. 后端构建交易，返回 base64 编码的交易
-    /// 2. 前端用钱包签名
-    /// 3. 前端调用 submit_signed_transaction 提交
+    /// Build unsigned NFT mint transaction.
+    ///
+    /// Returns a serialized transaction for the frontend to sign.
+    /// Flow:
+    /// 1. Backend builds transaction and returns base64-encoded bytes
+    /// 2. Frontend signs `message_to_sign` with the user's wallet
+    /// 3. Frontend calls `submit_signed_transaction` with the signature
     pub async fn build_mint_transaction(
         &self,
         player_wallet: &str,
@@ -704,20 +706,20 @@ impl SolanaService {
             player_wallet, element, threat_class, species_id
         );
 
-        // 获取 config PDA
+        // Get config PDA
         let (config_pda, _) = Pubkey::find_program_address(
             &[b"config"],
             &self.titan_program_id,
         );
         
-        // 读取 config 获取 total_titans_minted
+        // Read `total_titans_minted` from config
         let config_account = self.rpc_client.get_account(&config_pda).await
             .map_err(|e| {
                 tracing::error!("Failed to get config account: {}", e);
                 AppError::Internal(anyhow::anyhow!("Failed to get config: {}", e))
             })?;
         
-        // 从 config 读取 total_titans_minted (offset 150-157)
+        // Read `total_titans_minted` from config (offset 150-157)
         let total_minted = if config_account.data.len() >= 158 {
             u64::from_le_bytes(config_account.data[150..158].try_into().unwrap_or([0u8; 8]))
         } else {
@@ -726,7 +728,7 @@ impl SolanaService {
         let titan_id = total_minted + 1;
         tracing::info!("Next Titan ID: {}", titan_id);
 
-        // Derive Player PDA (基于玩家钱包)
+        // Derive Player PDA (based on player wallet)
         let (player_pda, _) = Pubkey::find_program_address(
             &[b"player", player.as_ref()],
             &self.titan_program_id,
@@ -739,7 +741,7 @@ impl SolanaService {
             &self.titan_program_id,
         );
 
-        // 生成随机属性
+        // Generate random attributes
         let (power, fortitude, velocity, resonance) = {
             use rand::Rng;
             let mut rng = rand::thread_rng();
@@ -751,7 +753,7 @@ impl SolanaService {
             )
         };
 
-        // 构建 MintTitanData
+        // Build MintTitanData
         let mut genes_6: [u8; 6] = [0u8; 6];
         genes_6.copy_from_slice(&genes[..6]);
 
@@ -773,17 +775,17 @@ impl SolanaService {
             signature: [0u8; 64],
         };
 
-        // 构建指令数据
+        // Build instruction data
         let mut instruction_data = vec![1u8]; // discriminator = 1 (mint_titan)
         instruction_data.extend(mint_data.to_bytes());
 
-        // 账户列表 - 玩家作为 payer 和签名者
+        // Account list - player as payer and signer
         let accounts = vec![
-            AccountMeta::new(player, true),                            // [0] payer (玩家签名)
+            AccountMeta::new(player, true),                            // [0] payer (player signature)
             AccountMeta::new(config_pda, false),                       // [1] config_account
             AccountMeta::new(player_pda, false),                       // [2] player_account
             AccountMeta::new(titan_pda, false),                        // [3] titan_account
-            AccountMeta::new(self.backend_keypair.pubkey(), true),     // [4] capture_authority (后端签名)
+            AccountMeta::new(self.backend_keypair.pubkey(), true),     // [4] capture_authority (backend signature)
             AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),       // [5] system_program
         ];
 
@@ -793,29 +795,29 @@ impl SolanaService {
             data: instruction_data,
         };
 
-        // 获取最新 blockhash
+        // Get latest blockhash
         let recent_blockhash = self.rpc_client.get_latest_blockhash().await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get blockhash: {}", e)))?;
 
-        // 创建未签名的交易
+        // Create unsigned transaction
         use solana_sdk::message::Message;
         let message = Message::new_with_blockhash(
             &[instruction],
-            Some(&player), // fee payer 是玩家
+            Some(&player), // fee payer is the player
             &recent_blockhash,
         );
         
-        // 创建带有空签名槽的交易
+        // Create transaction with empty signature slots
         let mut transaction = Transaction::new_unsigned(message);
-        // 初始化签名数组（空签名）
+        // Initialize signature array (empty signatures)
         let num_signers = transaction.message.header.num_required_signatures as usize;
         transaction.signatures = vec![solana_sdk::signature::Signature::default(); num_signers];
 
-        // 使用 bincode 序列化整个交易
+        // Serialize entire transaction using bincode
         let serialized_tx = bincode::serialize(&transaction)
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to serialize transaction: {}", e)))?;
         
-        // Base64 编码
+        // Base64 encode
         use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
         let encoded_tx = BASE64.encode(&serialized_tx);
 
@@ -824,7 +826,7 @@ impl SolanaService {
             player, titan_pda, encoded_tx.len(), num_signers
         );
 
-        // 同时返回用于签名的消息字节（前端签名需要）
+        // Return message bytes for frontend signing
         let message_to_sign = transaction.message.serialize();
         let encoded_message = BASE64.encode(&message_to_sign);
 
@@ -838,14 +840,15 @@ impl SolanaService {
         })
     }
 
-    /// 提交已签名的交易
-    /// 
-    /// 接收前端签名和原始交易，后端添加签名并广播
-    /// 
-    /// 流程：
-    /// 1. 前端对 message_to_sign 进行签名
-    /// 2. 前端把签名 + 原始交易发给后端
-    /// 3. 后端验证签名、添加自己的签名、广播
+    /// Submit a signed transaction.
+    ///
+    /// Accepts the frontend signature and original transaction,
+    /// adds the backend signature and broadcasts.
+    ///
+    /// Flow:
+    /// 1. Frontend signs `message_to_sign`
+    /// 2. Frontend sends signature + original transaction to backend
+    /// 3. Backend verifies signature, adds its own signature, broadcasts
     pub async fn submit_signed_transaction(
         &self,
         serialized_transaction: &str,
@@ -858,15 +861,15 @@ impl SolanaService {
         let player = Pubkey::from_str(player_wallet)
             .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
 
-        // 解码原始交易
+        // Decode original transaction
         let tx_bytes = BASE64.decode(serialized_transaction)
             .map_err(|e| AppError::BadRequest(format!("Invalid base64 transaction: {}", e)))?;
         
-        // 反序列化交易
+        // Deserialize transaction
         let mut transaction: Transaction = bincode::deserialize(&tx_bytes)
             .map_err(|e| AppError::BadRequest(format!("Invalid transaction format: {}", e)))?;
 
-        // 解码玩家签名
+        // Decode player signature
         let sig_bytes = BASE64.decode(player_signature)
             .map_err(|e| AppError::BadRequest(format!("Invalid base64 signature: {}", e)))?;
         
@@ -883,7 +886,7 @@ impl SolanaService {
             transaction.message.account_keys.len()
         );
 
-        // 验证玩家签名
+        // Verify player signature
         let message_bytes = transaction.message.serialize();
         
         if !player_sig.verify(player.as_ref(), &message_bytes) {
@@ -892,7 +895,7 @@ impl SolanaService {
         
         tracing::info!("Player signature verified for {}", player);
 
-        // 找到玩家和后端在签名数组中的位置
+        // Find player and backend in signature array
         let player_sig_idx = transaction.message.account_keys
             .iter()
             .position(|k| k == &player)
@@ -903,14 +906,14 @@ impl SolanaService {
             .position(|k| k == &self.backend_keypair.pubkey())
             .ok_or_else(|| AppError::Internal(anyhow::anyhow!("Backend not found in account keys")))?;
 
-        // 设置玩家签名
+        // Set player signature
         if player_sig_idx < transaction.signatures.len() {
             transaction.signatures[player_sig_idx] = player_sig;
         } else {
             return Err(AppError::BadRequest("Player signature index out of bounds".to_string()));
         }
         
-        // 添加后端签名
+        // Add backend signature
         let backend_sig = self.backend_keypair.sign_message(&message_bytes);
         
         if backend_sig_idx < transaction.signatures.len() {
@@ -921,7 +924,7 @@ impl SolanaService {
 
         tracing::info!("Submitting transaction with {} signatures", transaction.signatures.len());
 
-        // 发送交易
+        // Send transaction
         let signature = self.rpc_client.send_and_confirm_transaction(&transaction).await
             .map_err(|e| {
                 tracing::error!("Transaction submission failed: {:?}", e);
@@ -936,12 +939,12 @@ impl SolanaService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Titan 操作（Level Up, Evolve, Fuse, Transfer）
+    // Titan operations (Level Up, Evolve, Fuse, Transfer)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// 构建 Level Up 交易
-    /// 
-    /// 消耗经验值升级 Titan
+    /// Build Level Up transaction.
+    ///
+    /// Consumes experience to level up the Titan.
     pub async fn build_level_up_transaction(
         &self,
         player_wallet: &str,
@@ -957,7 +960,7 @@ impl SolanaService {
             &self.titan_program_id,
         );
 
-        // 构建指令 (discriminator = 2)
+        // Build instruction (discriminator = 2)
         let instruction_data = vec![2u8]; // LEVEL_UP
 
         let accounts = vec![
@@ -974,9 +977,9 @@ impl SolanaService {
         self.build_simple_transaction(&player, instruction).await
     }
 
-    /// 构建 Evolve 交易
-    /// 
-    /// 进化 Titan 到更高形态（需要等级 >= 30）
+    /// Build Evolve transaction.
+    ///
+    /// Evolves Titan to a higher form (requires level >= 30).
     pub async fn build_evolve_transaction(
         &self,
         player_wallet: &str,
@@ -993,7 +996,7 @@ impl SolanaService {
             &self.titan_program_id,
         );
 
-        // 构建指令 (discriminator = 3 + EvolveData)
+        // Build instruction (discriminator = 3 + EvolveData)
         let mut instruction_data = vec![3u8]; // EVOLVE
         instruction_data.extend(new_species_id.to_le_bytes());
 
@@ -1011,9 +1014,9 @@ impl SolanaService {
         self.build_simple_transaction(&player, instruction).await
     }
 
-    /// 构建 Fuse 交易
-    /// 
-    /// 融合两个 Titan 创建新的（需要同元素，等级 >= 20）
+    /// Build Fuse transaction.
+    ///
+    /// Fuses two Titans to create a new one (requires same element, level >= 20).
     pub async fn build_fuse_transaction(
         &self,
         player_wallet: &str,
@@ -1023,13 +1026,13 @@ impl SolanaService {
         let player = Pubkey::from_str(player_wallet)
             .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
 
-        // 获取 config
+        // Get config
         let (config_pda, _) = Pubkey::find_program_address(
             &[b"config"],
             &self.titan_program_id,
         );
 
-        // 读取 config 获取下一个 titan_id
+        // Read `total_titans_minted` from config
         let config_account = self.rpc_client.get_account(&config_pda).await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get config: {}", e)))?;
         
@@ -1059,7 +1062,7 @@ impl SolanaService {
             &self.titan_program_id,
         );
 
-        // 构建指令 (discriminator = 4)
+        // Build instruction (discriminator = 4)
         let instruction_data = vec![4u8]; // FUSE
 
         let accounts = vec![
@@ -1088,9 +1091,9 @@ impl SolanaService {
         })
     }
 
-    /// 构建 Transfer 交易
-    /// 
-    /// 转移 Titan 所有权给另一个玩家
+    /// Build Transfer transaction.
+    ///
+    /// Transfers Titan ownership to another player.
     pub async fn build_transfer_transaction(
         &self,
         from_wallet: &str,
@@ -1146,7 +1149,7 @@ impl SolanaService {
         self.build_simple_transaction(&from_owner, instruction).await
     }
 
-    /// 通用交易构建辅助函数
+    /// Helper for building simple single-signer transactions.
     async fn build_simple_transaction(
         &self,
         payer: &Pubkey,
@@ -1180,7 +1183,7 @@ impl SolanaService {
         })
     }
 
-    /// 提交只需用户签名的交易（Level Up, Evolve, Transfer 等）
+    /// Submit a user-signed transaction (Level Up, Evolve, Transfer, etc.).
     pub async fn submit_user_signed_transaction(
         &self,
         serialized_transaction: &str,
@@ -1238,9 +1241,9 @@ impl SolanaService {
     // Game Logic 操作（Record Capture, Record Battle, Add Experience）
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// 记录捕获到链上
-    /// 
-    /// 需要玩家和后端双签名
+    /// Record a capture on-chain.
+    ///
+    /// Requires both player and backend signatures.
     pub async fn record_capture_onchain(
         &self,
         player_wallet: &str,
@@ -1320,9 +1323,9 @@ impl SolanaService {
         })
     }
 
-    /// 记录战斗到链上
-    /// 
-    /// 需要玩家A和后端双签名
+    /// Record a battle on-chain.
+    ///
+    /// Requires player A and backend signatures.
     pub async fn record_battle_onchain(
         &self,
         player_a_wallet: &str,
@@ -1404,9 +1407,9 @@ impl SolanaService {
         })
     }
 
-    /// 添加经验值到 Titan
-    /// 
-    /// 通过 game_logic 合约 CPI 调用 titan_nft 的 add_experience
+    /// Add experience to a Titan.
+    ///
+    /// Uses the `game_logic` contract to CPI into `titan_nft`'s `add_experience`.
     pub async fn add_experience_onchain(
         &self,
         player_wallet: &str,
@@ -1469,7 +1472,7 @@ impl SolanaService {
         })
     }
 
-    /// 构建需要双签名的交易（玩家 + 后端）
+    /// Build a dual-signed transaction (player + backend).
     async fn build_dual_signed_transaction(
         &self,
         payer: &Pubkey,
@@ -1503,9 +1506,9 @@ impl SolanaService {
         })
     }
 
-    /// 分发 BREACH 代币奖励
-    /// 
-    /// 只需后端签名（直接执行）
+    /// Distribute BREACH token rewards.
+    ///
+    /// Only the backend signature is required (direct execution).
     pub async fn distribute_breach_reward(
         &self,
         player_wallet: &str,
@@ -1601,7 +1604,7 @@ impl SolanaService {
         })
     }
 
-    /// 提交双签名交易（玩家签名 + 后端签名）
+    /// Submit a dual-signed transaction (player + backend signatures).
     pub async fn submit_dual_signed_transaction(
         &self,
         serialized_transaction: &str,
@@ -1659,7 +1662,7 @@ impl SolanaService {
 
         tracing::info!("Submitting dual-signed transaction");
 
-        // 发送交易
+        // Send transaction
         let signature = self.rpc_client.send_and_confirm_transaction(&transaction).await
             .map_err(|e| {
                 tracing::error!("Transaction failed: {:?}", e);
@@ -1672,7 +1675,7 @@ impl SolanaService {
     }
 }
 
-/// Record Capture 结果
+/// Record Capture result
 #[derive(Debug, Clone, Serialize)]
 pub struct RecordCaptureResult {
     pub serialized_transaction: String,
@@ -1682,7 +1685,7 @@ pub struct RecordCaptureResult {
     pub capture_record_pda: String,
 }
 
-/// Record Battle 结果
+/// Record Battle result
 #[derive(Debug, Clone, Serialize)]
 pub struct RecordBattleResult {
     pub serialized_transaction: String,
@@ -1692,7 +1695,7 @@ pub struct RecordBattleResult {
     pub battle_record_pda: String,
 }
 
-/// Add Experience 结果
+/// Add Experience result
 #[derive(Debug, Clone, Serialize)]
 pub struct AddExperienceResult {
     pub serialized_transaction: String,
@@ -1702,7 +1705,7 @@ pub struct AddExperienceResult {
     pub exp_amount: u32,
 }
 
-/// 简单交易结果（只需用户签名）
+/// Simple transaction result (user-only signature)
 #[derive(Debug, Clone, Serialize)]
 pub struct SimpleTransactionResult {
     pub serialized_transaction: String,
@@ -1710,7 +1713,7 @@ pub struct SimpleTransactionResult {
     pub recent_blockhash: String,
 }
 
-/// Fuse 交易结果
+/// Fuse transaction result
 #[derive(Debug, Clone, Serialize)]
 pub struct FuseTransactionResult {
     pub serialized_transaction: String,
@@ -1720,27 +1723,27 @@ pub struct FuseTransactionResult {
     pub offspring_pda: String,
 }
 
-/// 构建交易的返回结果
+/// Build-transaction result
 #[derive(Debug, Clone, Serialize)]
 pub struct BuildTransactionResult {
-    /// Base64 编码的序列化交易（含空签名槽，bincode 格式）
+    /// Base64-encoded serialized transaction (with empty signature slots, bincode format)
     pub serialized_transaction: String,
-    /// Base64 编码的消息字节（用于前端签名）
+    /// Base64-encoded message bytes (for frontend signing)
     pub message_to_sign: String,
-    /// 最近的 blockhash
+    /// Recent blockhash
     pub recent_blockhash: String,
-    /// Titan PDA 地址（mint_address）
+    /// Titan PDA address (mint address)
     pub titan_pda: String,
-    /// Player PDA 地址
+    /// Player PDA address
     pub player_pda: String,
     /// Titan ID
     pub titan_id: u64,
 }
 
-/// 提交交易的返回结果
+/// Submit-transaction result
 #[derive(Debug, Clone, Serialize)]
 pub struct SubmitTransactionResult {
-    /// 交易签名
+    /// Transaction signature
     pub signature: String,
 }
 

@@ -310,3 +310,26 @@ pub struct PriceChartResponse {
     pub min_price: i64,
     pub max_price: i64,
 }
+
+/// Purchase transaction response (for on-chain purchases)
+#[derive(Debug, Serialize)]
+pub struct PurchaseTransactionResponse {
+    pub listing_id: Uuid,
+    pub titan_id: Uuid,
+    pub titan_onchain_id: Option<u64>,  // On-chain Titan ID
+    pub seller_wallet: String,
+    pub buyer_wallet: String,
+    pub price: i64,
+    pub fee: i64,
+    pub total: i64,
+    pub serialized_transaction: String,
+    pub message_to_sign: String,
+    pub recent_blockhash: String,
+}
+
+/// Purchase completion request
+#[derive(Debug, Deserialize)]
+pub struct CompletePurchaseRequest {
+    pub serialized_transaction: String,
+    pub user_signature: String,
+}
