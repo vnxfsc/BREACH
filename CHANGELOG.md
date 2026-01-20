@@ -16,6 +16,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.4] - 2026-01-20
+
+### Added - Production-Ready Frontend Signing Flow
+
+#### New Capture API Endpoints (`backend/src/api/capture.rs`)
+- `POST /api/v1/capture/build-transaction` - Build unsigned mint transaction
+- `POST /api/v1/capture/submit-transaction` - Submit player-signed transaction
+
+#### Frontend Signing Flow
+Complete production-ready transaction signing workflow:
+1. Frontend requests transaction via `build-transaction`
+2. Backend returns `serialized_transaction` + `message_to_sign`
+3. Frontend signs `message_to_sign` with user's wallet
+4. Frontend submits signature + original transaction via `submit-transaction`
+5. Backend verifies signature, adds `capture_authority` signature, broadcasts
+
+#### Security Improvements
+- **User Authorization Required**: NFT minting now requires explicit user wallet signature
+- **Dual Signature**: Both player and backend must sign (player for ownership, backend for capture validation)
+- **Titan Ownership**: NFTs are now correctly owned by the player wallet, not the backend
+
+#### Backend Service Updates (`backend/src/services/solana.rs`)
+- `build_mint_transaction()` - Builds transaction with empty signature slots
+- `submit_signed_transaction()` - Validates player signature, adds backend signature, broadcasts
+- Returns `message_to_sign` for cross-language compatibility (avoids bincode serialization issues)
+
+#### Test Scripts
+- `contracts/tests/test-signed-capture.ts` - Complete frontend signing flow test
+- `contracts/tests/test-capture-mint.ts` - Backend-paid capture test (for development)
+
+### Fixed - Config Data Offset
+- Fixed `total_titans_minted` read offset from 167 to 150 (correct GlobalConfig layout)
+
+### Added - Game Logic Recovery Instruction
+- `force_update_authority` instruction for program authority recovery
+- Allows program upgrade authority to reset config authorities if keys are lost
+- **Security Note**: Should be removed or restricted before mainnet deployment
+
+### Technical Details
+- Added `bincode v1.3` dependency for transaction serialization
+- Frontend signs Solana message bytes directly (compatible with all wallet adapters)
+- Backend uses bincode for internal transaction storage, base64 for API transport
+
+---
+
 ## [0.7.3] - 2026-01-20
 
 ### Fixed - Smart Contract Security

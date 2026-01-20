@@ -45,6 +45,7 @@ pub fn process_instruction(
         4 => distribute_reward::process(program_id, accounts, data),
         5 => update_config::process(program_id, accounts, data),
         6 => set_paused::process(program_id, accounts, data),
+        7 => force_update_authority::process(program_id, accounts, data),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }

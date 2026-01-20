@@ -20,6 +20,8 @@ use solana_sdk::{
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::ID as TOKEN_PROGRAM_ID;
 
+use serde::Serialize;
+
 use crate::config::SolanaConfig;
 use crate::error::{ApiResult, AppError};
 use crate::models::Element;
@@ -35,13 +37,43 @@ pub struct SolanaService {
     breach_token_mint: Pubkey,
 }
 
-/// Titan NFT data for minting
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+/// Titan NFT data for minting (matches contract MintTitanData)
+/// Total size: 88 bytes (packed)
+#[repr(C, packed)]
+#[derive(Debug, Clone, Copy)]
 pub struct TitanMintData {
-    pub element: u8,
-    pub threat_class: u8,
-    pub species_id: u32,
-    pub genes: [u8; 32],
+    pub species_id: u16,        // 2 bytes
+    pub threat_class: u8,       // 1 byte
+    pub element_type: u8,       // 1 byte
+    pub power: u8,              // 1 byte
+    pub fortitude: u8,          // 1 byte
+    pub velocity: u8,           // 1 byte
+    pub resonance: u8,          // 1 byte
+    pub genes: [u8; 6],         // 6 bytes
+    pub capture_lat: i32,       // 4 bytes
+    pub capture_lng: i32,       // 4 bytes
+    pub nonce: u64,             // 8 bytes
+    pub signature: [u8; 64],    // 64 bytes - placeholder, not verified on-chain
+}
+
+impl TitanMintData {
+    // 序列化为字节数组
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(88);
+        bytes.extend_from_slice(&self.species_id.to_le_bytes());
+        bytes.push(self.threat_class);
+        bytes.push(self.element_type);
+        bytes.push(self.power);
+        bytes.push(self.fortitude);
+        bytes.push(self.velocity);
+        bytes.push(self.resonance);
+        bytes.extend_from_slice(&self.genes);
+        bytes.extend_from_slice(&self.capture_lat.to_le_bytes());
+        bytes.extend_from_slice(&self.capture_lng.to_le_bytes());
+        bytes.extend_from_slice(&self.nonce.to_le_bytes());
+        bytes.extend_from_slice(&self.signature);
+        bytes
+    }
 }
 
 /// Battle record data for on-chain storage
@@ -183,6 +215,14 @@ impl SolanaService {
     /// 
     /// This calls the Titan NFT program to create a new NFT
     /// with the specified attributes.
+    /// 
+    /// Account layout (must match contract):
+    /// [0] payer - 玩家钱包 (签名者)
+    /// [1] config_account - Config PDA
+    /// [2] player_account - Player PDA  
+    /// [3] titan_account - Titan PDA
+    /// [4] capture_authority - 后端钱包 (签名者)
+    /// [5] system_program
     pub async fn mint_titan_nft(
         &self,
         player_wallet: &str,
@@ -191,46 +231,129 @@ impl SolanaService {
         species_id: u32,
         genes: [u8; 32],
     ) -> ApiResult<MintResult> {
-        let player = Pubkey::from_str(player_wallet)
+        // 注意：当前实现使用后端钱包作为 payer (测试用)
+        // 真正的玩家钱包地址仅作为记录保留
+        let _player = Pubkey::from_str(player_wallet)
             .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
-
-        // Generate new mint keypair for the NFT
-        let mint_keypair = Keypair::new();
-        let mint_pubkey = mint_keypair.pubkey();
-
-        // Derive PDA for titan data account
-        let (titan_data_pda, _bump) = Pubkey::find_program_address(
-            &[b"titan", mint_pubkey.as_ref()],
-            &self.titan_program_id,
+        
+        // 临时方案：使用后端作为 payer
+        // TODO: 生产环境应修改合约支持 mint_titan_for_player 或使用前端签名
+        let payer = self.backend_keypair.pubkey();
+        
+        tracing::info!(
+            "Minting Titan NFT: player={}, payer(backend)={}, element={:?}, threat_class={}, species_id={}",
+            player_wallet, payer, element, threat_class, species_id
         );
 
-        // Get player's associated token account
-        let player_token_account = get_associated_token_address(&player, &mint_pubkey);
+        // 获取当前 config 来确定 titan_id
+        let (config_pda, _) = Pubkey::find_program_address(
+            &[b"config"],
+            &self.titan_program_id,
+        );
+        
+        // 读取 config 获取 total_titans_minted
+        let config_account = self.rpc_client.get_account(&config_pda).await
+            .map_err(|e| {
+                tracing::error!("Failed to get config account: {}", e);
+                AppError::Internal(anyhow::anyhow!("Failed to get config: {}", e))
+            })?;
+        
+        tracing::debug!("Config account data length: {}", config_account.data.len());
+        
+        // GlobalConfig 布局 (packed, 无填充):
+        // - discriminator: [u8; 8] - offset 0-7
+        // - authority: Pubkey - offset 8-39
+        // - treasury: Pubkey - offset 40-71
+        // - breach_mint: Pubkey - offset 72-103
+        // - capture_authority: Pubkey - offset 104-135
+        // - capture_fee_bps: u16 - offset 136-137
+        // - marketplace_fee_bps: u16 - offset 138-139
+        // - fusion_fee_bps: u16 - offset 140-141
+        // - max_titans_per_wallet: u16 - offset 142-143
+        // - capture_cooldown_seconds: u32 - offset 144-147
+        // - paused: bool - offset 148
+        // - bump: u8 - offset 149
+        // - total_titans_minted: u64 - offset 150-157
+        // 总大小: 182 bytes
+        let total_minted = if config_account.data.len() >= 158 {
+            u64::from_le_bytes(config_account.data[150..158].try_into().unwrap_or([0u8; 8]))
+        } else {
+            tracing::warn!("Config account too small, assuming total_minted=0");
+            0
+        };
+        let titan_id = total_minted + 1;
+        tracing::info!("Next Titan ID: {}", titan_id);
 
-        // Prepare mint instruction data
-        let mint_data = TitanMintData {
-            element: element.as_u8(),
-            threat_class,
-            species_id,
-            genes,
+        // Derive Player PDA (使用后端作为 payer)
+        let (player_pda, _) = Pubkey::find_program_address(
+            &[b"player", payer.as_ref()],
+            &self.titan_program_id,
+        );
+        tracing::debug!("Player PDA (for backend): {}", player_pda);
+
+        // Derive Titan PDA
+        let titan_id_bytes = titan_id.to_le_bytes();
+        let (titan_pda, _) = Pubkey::find_program_address(
+            &[b"titan", &titan_id_bytes],
+            &self.titan_program_id,
+        );
+        tracing::debug!("Titan PDA: {}", titan_pda);
+
+        // 生成随机属性 (power, fortitude, velocity, resonance)
+        // 在单独的块中使用 rng，避免跨 await 点
+        let (power, fortitude, velocity, resonance) = {
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
+            (
+                rng.gen_range(10..100u8),
+                rng.gen_range(10..100u8),
+                rng.gen_range(10..100u8),
+                rng.gen_range(10..100u8),
+            )
         };
 
-        // Build instruction
-        // Instruction layout: [discriminator(8)] + [data]
-        let mut instruction_data = vec![0u8; 8]; // Discriminator for "mint_titan"
-        instruction_data.extend(borsh::to_vec(&mint_data)
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Borsh error: {}", e)))?);
+        // 生成 6 字节基因
+        let mut genes_6: [u8; 6] = [0u8; 6];
+        genes_6.copy_from_slice(&genes[..6]);
 
+        // 准备 mint 指令数据 (instruction discriminator 1 = mint_titan)
+        let mint_data = TitanMintData {
+            species_id: species_id as u16,
+            threat_class,
+            element_type: element.as_u8(),
+            power,
+            fortitude,
+            velocity,
+            resonance,
+            genes: genes_6,
+            capture_lat: 35658600,  // 东京纬度 * 10^6
+            capture_lng: 139745200, // 东京经度 * 10^6
+            nonce: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            signature: [0u8; 64], // 占位符，合约不验证
+        };
+
+        // 构建指令数据: discriminator(1) + MintTitanData
+        let mut instruction_data = vec![1u8]; // 1 = mint_titan instruction
+        instruction_data.extend(mint_data.to_bytes());
+
+        // 账户列表 (必须匹配合约)
+        // 临时方案：后端既是 payer 又是 capture_authority
         let accounts = vec![
-            AccountMeta::new(mint_pubkey, true),           // mint (signer)
-            AccountMeta::new(titan_data_pda, false),       // titan_data PDA
-            AccountMeta::new(player_token_account, false), // player token account
-            AccountMeta::new(player, false),               // player
-            AccountMeta::new(self.backend_keypair.pubkey(), true), // authority (signer)
-            AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
-            AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
-            AccountMeta::new_readonly(spl_associated_token_account::ID, false),
+            AccountMeta::new(payer, true),                            // [0] payer (后端签名者，临时方案)
+            AccountMeta::new(config_pda, false),                      // [1] config_account
+            AccountMeta::new(player_pda, false),                      // [2] player_account
+            AccountMeta::new(titan_pda, false),                       // [3] titan_account
+            AccountMeta::new(self.backend_keypair.pubkey(), true),    // [4] capture_authority (后端签名者)
+            AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),      // [5] system_program
         ];
+        
+        tracing::debug!(
+            "Mint instruction accounts: payer={}, config={}, player_pda={}, titan_pda={}, capture_auth={}",
+            payer, config_pda, player_pda, titan_pda, self.backend_keypair.pubkey()
+        );
 
         let instruction = Instruction {
             program_id: self.titan_program_id,
@@ -238,26 +361,38 @@ impl SolanaService {
             data: instruction_data,
         };
 
-        // Get recent blockhash
+        // 获取最新 blockhash
         let recent_blockhash = self.rpc_client.get_latest_blockhash().await
             .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get blockhash: {}", e)))?;
 
-        // Create and sign transaction
+        // 注意: 这里需要玩家签名，但后端无法获取玩家私钥
+        // 在实际应用中，应该使用交易预签名或由前端发起交易
+        // 目前的实现是后端代付，玩家不需要签名
+        // 这需要修改合约或使用不同的方式
+        
+        // 暂时使用后端作为 payer (这需要合约支持)
+        // 创建交易，后端作为唯一签名者
         let transaction = Transaction::new_signed_with_payer(
             &[instruction],
             Some(&self.backend_keypair.pubkey()),
-            &[&*self.backend_keypair, &mint_keypair],
+            &[&*self.backend_keypair],
             recent_blockhash,
         );
 
-        // Send transaction
+        // 发送交易
+        tracing::info!("Sending mint transaction to Solana...");
         let signature = self.rpc_client.send_and_confirm_transaction(&transaction).await
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Transaction failed: {}", e)))?;
+            .map_err(|e| {
+                tracing::error!("Mint transaction failed: {:?}", e);
+                AppError::Internal(anyhow::anyhow!("Mint transaction failed: {}", e))
+            })?;
+        
+        tracing::info!("Mint transaction successful: {}", signature);
 
         Ok(MintResult {
             signature: signature.to_string(),
-            mint_address: mint_pubkey.to_string(),
-            token_account: player_token_account.to_string(),
+            mint_address: titan_pda.to_string(), // Titan PDA 作为 NFT 地址
+            token_account: player_pda.to_string(), // Player PDA
         })
     }
 
@@ -539,6 +674,290 @@ impl SolanaService {
         
         Ok(signature.to_string())
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // 生产级交易构建 API（支持前端签名）
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// 构建 NFT 铸造交易（未签名）
+    /// 
+    /// 返回序列化的交易，供前端签名
+    /// 流程：
+    /// 1. 后端构建交易，返回 base64 编码的交易
+    /// 2. 前端用钱包签名
+    /// 3. 前端调用 submit_signed_transaction 提交
+    pub async fn build_mint_transaction(
+        &self,
+        player_wallet: &str,
+        element: Element,
+        threat_class: u8,
+        species_id: u32,
+        genes: [u8; 32],
+        capture_lat: i32,
+        capture_lng: i32,
+    ) -> ApiResult<BuildTransactionResult> {
+        let player = Pubkey::from_str(player_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
+        
+        tracing::info!(
+            "Building mint transaction: player={}, element={:?}, threat_class={}, species_id={}",
+            player_wallet, element, threat_class, species_id
+        );
+
+        // 获取 config PDA
+        let (config_pda, _) = Pubkey::find_program_address(
+            &[b"config"],
+            &self.titan_program_id,
+        );
+        
+        // 读取 config 获取 total_titans_minted
+        let config_account = self.rpc_client.get_account(&config_pda).await
+            .map_err(|e| {
+                tracing::error!("Failed to get config account: {}", e);
+                AppError::Internal(anyhow::anyhow!("Failed to get config: {}", e))
+            })?;
+        
+        // 从 config 读取 total_titans_minted (offset 150-157)
+        let total_minted = if config_account.data.len() >= 158 {
+            u64::from_le_bytes(config_account.data[150..158].try_into().unwrap_or([0u8; 8]))
+        } else {
+            0
+        };
+        let titan_id = total_minted + 1;
+        tracing::info!("Next Titan ID: {}", titan_id);
+
+        // Derive Player PDA (基于玩家钱包)
+        let (player_pda, _) = Pubkey::find_program_address(
+            &[b"player", player.as_ref()],
+            &self.titan_program_id,
+        );
+
+        // Derive Titan PDA
+        let titan_id_bytes = titan_id.to_le_bytes();
+        let (titan_pda, _) = Pubkey::find_program_address(
+            &[b"titan", &titan_id_bytes],
+            &self.titan_program_id,
+        );
+
+        // 生成随机属性
+        let (power, fortitude, velocity, resonance) = {
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
+            (
+                rng.gen_range(10..100u8),
+                rng.gen_range(10..100u8),
+                rng.gen_range(10..100u8),
+                rng.gen_range(10..100u8),
+            )
+        };
+
+        // 构建 MintTitanData
+        let mut genes_6: [u8; 6] = [0u8; 6];
+        genes_6.copy_from_slice(&genes[..6]);
+
+        let mint_data = TitanMintData {
+            species_id: species_id as u16,
+            threat_class,
+            element_type: element.as_u8(),
+            power,
+            fortitude,
+            velocity,
+            resonance,
+            genes: genes_6,
+            capture_lat,
+            capture_lng,
+            nonce: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            signature: [0u8; 64],
+        };
+
+        // 构建指令数据
+        let mut instruction_data = vec![1u8]; // discriminator = 1 (mint_titan)
+        instruction_data.extend(mint_data.to_bytes());
+
+        // 账户列表 - 玩家作为 payer 和签名者
+        let accounts = vec![
+            AccountMeta::new(player, true),                            // [0] payer (玩家签名)
+            AccountMeta::new(config_pda, false),                       // [1] config_account
+            AccountMeta::new(player_pda, false),                       // [2] player_account
+            AccountMeta::new(titan_pda, false),                        // [3] titan_account
+            AccountMeta::new(self.backend_keypair.pubkey(), true),     // [4] capture_authority (后端签名)
+            AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),       // [5] system_program
+        ];
+
+        let instruction = Instruction {
+            program_id: self.titan_program_id,
+            accounts,
+            data: instruction_data,
+        };
+
+        // 获取最新 blockhash
+        let recent_blockhash = self.rpc_client.get_latest_blockhash().await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get blockhash: {}", e)))?;
+
+        // 创建未签名的交易
+        use solana_sdk::message::Message;
+        let message = Message::new_with_blockhash(
+            &[instruction],
+            Some(&player), // fee payer 是玩家
+            &recent_blockhash,
+        );
+        
+        // 创建带有空签名槽的交易
+        let mut transaction = Transaction::new_unsigned(message);
+        // 初始化签名数组（空签名）
+        let num_signers = transaction.message.header.num_required_signatures as usize;
+        transaction.signatures = vec![solana_sdk::signature::Signature::default(); num_signers];
+
+        // 使用 bincode 序列化整个交易
+        let serialized_tx = bincode::serialize(&transaction)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to serialize transaction: {}", e)))?;
+        
+        // Base64 编码
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+        let encoded_tx = BASE64.encode(&serialized_tx);
+
+        tracing::info!(
+            "Built mint transaction: player={}, titan_pda={}, tx_len={}, signers={}",
+            player, titan_pda, encoded_tx.len(), num_signers
+        );
+
+        // 同时返回用于签名的消息字节（前端签名需要）
+        let message_to_sign = transaction.message.serialize();
+        let encoded_message = BASE64.encode(&message_to_sign);
+
+        Ok(BuildTransactionResult {
+            serialized_transaction: encoded_tx,
+            message_to_sign: encoded_message,
+            recent_blockhash: recent_blockhash.to_string(),
+            titan_pda: titan_pda.to_string(),
+            player_pda: player_pda.to_string(),
+            titan_id,
+        })
+    }
+
+    /// 提交已签名的交易
+    /// 
+    /// 接收前端签名和原始交易，后端添加签名并广播
+    /// 
+    /// 流程：
+    /// 1. 前端对 message_to_sign 进行签名
+    /// 2. 前端把签名 + 原始交易发给后端
+    /// 3. 后端验证签名、添加自己的签名、广播
+    pub async fn submit_signed_transaction(
+        &self,
+        serialized_transaction: &str,
+        player_signature: &str,
+        player_wallet: &str,
+    ) -> ApiResult<SubmitTransactionResult> {
+        use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+        use solana_sdk::signature::Signature;
+        
+        let player = Pubkey::from_str(player_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
+
+        // 解码原始交易
+        let tx_bytes = BASE64.decode(serialized_transaction)
+            .map_err(|e| AppError::BadRequest(format!("Invalid base64 transaction: {}", e)))?;
+        
+        // 反序列化交易
+        let mut transaction: Transaction = bincode::deserialize(&tx_bytes)
+            .map_err(|e| AppError::BadRequest(format!("Invalid transaction format: {}", e)))?;
+
+        // 解码玩家签名
+        let sig_bytes = BASE64.decode(player_signature)
+            .map_err(|e| AppError::BadRequest(format!("Invalid base64 signature: {}", e)))?;
+        
+        if sig_bytes.len() != 64 {
+            return Err(AppError::BadRequest(format!("Invalid signature length: {}", sig_bytes.len())));
+        }
+        
+        let player_sig = Signature::try_from(sig_bytes.as_slice())
+            .map_err(|e| AppError::BadRequest(format!("Invalid signature: {}", e)))?;
+
+        tracing::info!(
+            "Received transaction with {} signatures, {} account keys",
+            transaction.signatures.len(),
+            transaction.message.account_keys.len()
+        );
+
+        // 验证玩家签名
+        let message_bytes = transaction.message.serialize();
+        
+        if !player_sig.verify(player.as_ref(), &message_bytes) {
+            return Err(AppError::BadRequest("Invalid player signature".to_string()));
+        }
+        
+        tracing::info!("Player signature verified for {}", player);
+
+        // 找到玩家和后端在签名数组中的位置
+        let player_sig_idx = transaction.message.account_keys
+            .iter()
+            .position(|k| k == &player)
+            .ok_or_else(|| AppError::BadRequest("Player not found in account keys".to_string()))?;
+        
+        let backend_sig_idx = transaction.message.account_keys
+            .iter()
+            .position(|k| k == &self.backend_keypair.pubkey())
+            .ok_or_else(|| AppError::Internal(anyhow::anyhow!("Backend not found in account keys")))?;
+
+        // 设置玩家签名
+        if player_sig_idx < transaction.signatures.len() {
+            transaction.signatures[player_sig_idx] = player_sig;
+        } else {
+            return Err(AppError::BadRequest("Player signature index out of bounds".to_string()));
+        }
+        
+        // 添加后端签名
+        let backend_sig = self.backend_keypair.sign_message(&message_bytes);
+        
+        if backend_sig_idx < transaction.signatures.len() {
+            transaction.signatures[backend_sig_idx] = backend_sig;
+        } else {
+            return Err(AppError::Internal(anyhow::anyhow!("Backend signature index out of bounds")));
+        }
+
+        tracing::info!("Submitting transaction with {} signatures", transaction.signatures.len());
+
+        // 发送交易
+        let signature = self.rpc_client.send_and_confirm_transaction(&transaction).await
+            .map_err(|e| {
+                tracing::error!("Transaction submission failed: {:?}", e);
+                AppError::Internal(anyhow::anyhow!("Transaction failed: {}", e))
+            })?;
+
+        tracing::info!("Transaction submitted successfully: {}", signature);
+
+        Ok(SubmitTransactionResult {
+            signature: signature.to_string(),
+        })
+    }
+}
+
+/// 构建交易的返回结果
+#[derive(Debug, Clone, Serialize)]
+pub struct BuildTransactionResult {
+    /// Base64 编码的序列化交易（含空签名槽，bincode 格式）
+    pub serialized_transaction: String,
+    /// Base64 编码的消息字节（用于前端签名）
+    pub message_to_sign: String,
+    /// 最近的 blockhash
+    pub recent_blockhash: String,
+    /// Titan PDA 地址（mint_address）
+    pub titan_pda: String,
+    /// Player PDA 地址
+    pub player_pda: String,
+    /// Titan ID
+    pub titan_id: u64,
+}
+
+/// 提交交易的返回结果
+#[derive(Debug, Clone, Serialize)]
+pub struct SubmitTransactionResult {
+    /// 交易签名
+    pub signature: String,
 }
 
 #[cfg(test)]

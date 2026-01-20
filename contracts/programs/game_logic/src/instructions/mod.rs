@@ -7,3 +7,4 @@ pub mod add_experience;
 pub mod distribute_reward;
 pub mod update_config;
 pub mod set_paused;
+pub mod force_update_authority;

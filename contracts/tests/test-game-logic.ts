@@ -1130,13 +1130,14 @@ async function main() {
   const payer = loadWallet(walletPath);
   console.log(`\nPayer: ${payer.publicKey.toBase58()}`);
 
-  // Generate backend authority and test users
-  const backendAuthority = Keypair.generate();
+  // Use the same wallet as backend authority (ensures consistent config)
+  // This prevents the issue of losing access to randomly generated keypairs
+  const backendAuthority = payer; // 使用相同的钱包作为 backend authority
   const playerB = Keypair.generate();
   const unauthorizedUser = Keypair.generate();
   const fakeBackend = Keypair.generate();
 
-  console.log(`Backend Authority: ${backendAuthority.publicKey.toBase58()}`);
+  console.log(`Backend Authority: ${backendAuthority.publicKey.toBase58()} (same as payer)`);
   console.log(`Player B: ${playerB.publicKey.toBase58()}`);
 
   const balance = await connection.getBalance(payer.publicKey);
@@ -1153,9 +1154,9 @@ async function main() {
     }
   }
 
-  // Fund test accounts
+  // Fund test accounts (backendAuthority is same as payer, no need to fund)
   console.log("\nFunding test accounts...");
-  for (const account of [backendAuthority, playerB, unauthorizedUser, fakeBackend]) {
+  for (const account of [playerB, unauthorizedUser, fakeBackend]) {
     try {
       const sig = await connection.requestAirdrop(account.publicKey, 0.05 * LAMPORTS_PER_SOL);
       await connection.confirmTransaction(sig);
