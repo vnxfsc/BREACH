@@ -1503,6 +1503,104 @@ impl SolanaService {
         })
     }
 
+    /// 分发 BREACH 代币奖励
+    /// 
+    /// 只需后端签名（直接执行）
+    pub async fn distribute_breach_reward(
+        &self,
+        player_wallet: &str,
+        reward_type: u8,
+        amount: u64,
+    ) -> ApiResult<SubmitTransactionResult> {
+        let backend_keypair = &self.backend_keypair;
+        let player = Pubkey::from_str(player_wallet)
+            .map_err(|e| AppError::BadRequest(format!("Invalid player wallet: {}", e)))?;
+
+        // 获取 game config
+        let (game_config_pda, _) = Pubkey::find_program_address(
+            &[b"game_config"],
+            &self.game_program_id,
+        );
+
+        // 读取 config 获取 reward_pool
+        let config_account = self.rpc_client.get_account(&game_config_pda).await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get game config: {}", e)))?;
+        
+        // reward_pool 在 offset 136 处 (32*4 + 32 + 8)
+        if config_account.data.len() < 168 {
+            return Err(AppError::Internal(anyhow::anyhow!("Invalid config account size")));
+        }
+        let reward_pool_bytes = &config_account.data[136..168];
+        let reward_pool = Pubkey::new_from_array(
+            reward_pool_bytes.try_into()
+                .map_err(|_| AppError::Internal(anyhow::anyhow!("Invalid reward pool pubkey")))?
+        );
+
+        // 获取或创建玩家的 BREACH token 账户
+        let player_token_account = spl_associated_token_account::get_associated_token_address(
+            &player,
+            &self.breach_token_mint,
+        );
+
+        // 检查玩家 token 账户是否存在
+        let account_exists = self.rpc_client.get_account(&player_token_account).await.is_ok();
+        
+        let mut instructions = Vec::new();
+
+        // 如果账户不存在，创建 ATA
+        if !account_exists {
+            let create_ata_ix = spl_associated_token_account::instruction::create_associated_token_account(
+                &backend_keypair.pubkey(), // payer
+                &player,                   // wallet
+                &self.breach_token_mint,   // mint
+                &spl_token::ID,
+            );
+            instructions.push(create_ata_ix);
+        }
+
+        // 构建 distribute_reward 指令 (discriminator = 4)
+        let mut instruction_data = vec![4u8]; // DISTRIBUTE_REWARD
+        instruction_data.push(reward_type);
+        instruction_data.extend(amount.to_le_bytes());
+
+        let distribute_ix = Instruction {
+            program_id: self.game_program_id,
+            accounts: vec![
+                AccountMeta::new_readonly(backend_keypair.pubkey(), true), // [0] backend_authority (signer)
+                AccountMeta::new(game_config_pda, false),                  // [1] config
+                AccountMeta::new(reward_pool, false),                      // [2] reward_pool
+                AccountMeta::new(player_token_account, false),             // [3] player_token_account
+                AccountMeta::new_readonly(spl_token::ID, false),           // [4] token_program
+            ],
+            data: instruction_data,
+        };
+        instructions.push(distribute_ix);
+
+        // 构建并发送交易
+        let recent_blockhash = self.rpc_client.get_latest_blockhash().await
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to get blockhash: {}", e)))?;
+
+        let transaction = Transaction::new_signed_with_payer(
+            &instructions,
+            Some(&backend_keypair.pubkey()),
+            &[backend_keypair],
+            recent_blockhash,
+        );
+
+        tracing::info!("Distributing {} BREACH reward (type {}) to {}", 
+            amount as f64 / 1_000_000_000.0, reward_type, player_wallet);
+
+        let signature = self.rpc_client.send_and_confirm_transaction(&transaction).await
+            .map_err(|e| {
+                tracing::error!("Reward distribution failed: {:?}", e);
+                AppError::Internal(anyhow::anyhow!("Reward distribution failed: {}", e))
+            })?;
+
+        Ok(SubmitTransactionResult {
+            signature: signature.to_string(),
+        })
+    }
+
     /// 提交双签名交易（玩家签名 + 后端签名）
     pub async fn submit_dual_signed_transaction(
         &self,

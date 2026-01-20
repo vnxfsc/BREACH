@@ -205,7 +205,7 @@ async function main() {
     console.log('✅ 认证成功');
 
     // 测试参数
-    const testTitanId = 65559; // 使用最新铸造的 Titan
+    const testTitanId = 65563; // 使用最新铸造的 Titan
 
     // 测试 Add Experience
     console.log('\n' + '─'.repeat(60));

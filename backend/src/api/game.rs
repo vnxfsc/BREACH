@@ -174,6 +174,71 @@ async fn build_add_experience(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Distribute Reward API
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[derive(Debug, Deserialize)]
+pub struct DistributeRewardRequest {
+    /// 奖励类型 (0=capture, 1=battle_win, 2=daily_bonus)
+    pub reward_type: u8,
+    /// 基础金额（lamports）
+    pub amount: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DistributeRewardResponse {
+    pub success: bool,
+    pub tx_signature: String,
+    pub amount: u64,
+    pub reward_type: u8,
+}
+
+/// 分发 BREACH 代币奖励（后端直接转账）
+/// 
+/// 注意：当前使用后端直接转账而非链上 game_logic 合约
+/// 因为 reward pool 尚未初始化
+async fn distribute_reward(
+    State(state): State<Arc<AppState>>,
+    AuthPlayer(player): AuthPlayer,
+    Json(request): Json<DistributeRewardRequest>,
+) -> ApiResult<Json<DistributeRewardResponse>> {
+    let solana = state.services.solana.as_ref()
+        .ok_or(AppError::Internal(anyhow::anyhow!("Solana service not available")))?;
+
+    // 验证奖励类型
+    if request.reward_type > 2 {
+        return Err(AppError::BadRequest("Invalid reward type".to_string()));
+    }
+
+    // 验证金额
+    if request.amount == 0 {
+        return Err(AppError::BadRequest("Amount must be greater than 0".to_string()));
+    }
+
+    // 计算奖励倍数（与合约逻辑保持一致）
+    let multiplier = match request.reward_type {
+        0 => 1,  // Capture
+        1 => 2,  // Battle Win (2x)
+        2 => 5,  // Daily Bonus (5x)
+        _ => 1,
+    };
+    let final_amount = request.amount * multiplier;
+
+    // 直接使用 transfer_breach_tokens（绕过链上 distribute_reward）
+    let result = solana.transfer_breach_tokens(
+        &player.wallet_address,
+        final_amount,
+    ).await?;
+
+    Ok(Json(DistributeRewardResponse {
+        success: true,
+        tx_signature: result.signature,
+        amount: final_amount,  // 返回实际分发的金额（已应用倍数）
+        reward_type: request.reward_type,
+    }))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // 提交双签名交易 API
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -224,5 +289,7 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .route("/game/experience/build", post(build_add_experience))
         // 提交交易端点
         .route("/game/submit", post(submit_dual_signed))
+        // 奖励分发端点
+        .route("/game/reward/distribute", post(distribute_reward))
         .with_state(state)
 }

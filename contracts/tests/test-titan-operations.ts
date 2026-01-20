@@ -209,15 +209,15 @@ async function main() {
     console.log('✅ 认证成功');
 
     // 测试参数（需要根据实际链上数据调整）
-    const testTitanId = 65558; // 之前铸造的 Titan ID
+    const testTitanId = 65563; // 最新铸造的 Titan ID（已添加 500 经验值）
     
     // 测试各个操作
     // 注意: 这些测试可能会因为条件不满足而失败（比如经验值不够升级）
     
     console.log('\n' + '─'.repeat(60));
     console.log('测试 Level Up (需要足够经验值)');
-    console.log('⚠️ 跳过: 新铸造的 Titan 经验值为 0，无法升级');
-    // await testLevelUp(token, wallet, testTitanId);
+    console.log('✅ Titan 已有 500 经验值，可以升级');
+    await testLevelUp(token, wallet, testTitanId);
 
     console.log('\n' + '─'.repeat(60));
     console.log('测试 Evolve (需要等级 >= 30)');
@@ -226,10 +226,11 @@ async function main() {
 
     console.log('\n' + '─'.repeat(60));
     console.log('测试 Transfer');
+    console.log('⚠️ 跳过: 避免 Titan 被转走');
     // 创建一个新钱包作为接收者
-    const receiver = Keypair.generate();
-    console.log('📤 接收者钱包:', receiver.publicKey.toBase58());
-    await testTransfer(token, wallet, testTitanId, receiver.publicKey.toBase58());
+    // const receiver = Keypair.generate();
+    // console.log('📤 接收者钱包:', receiver.publicKey.toBase58());
+    // await testTransfer(token, wallet, testTitanId, receiver.publicKey.toBase58());
 
     console.log('\n' + '─'.repeat(60));
     console.log('测试 Fuse (需要两个同元素、等级 >= 20 的 Titan)');

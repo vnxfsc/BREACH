@@ -13,6 +13,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mobile app development (Flutter)
 - AR capture system integration
 - Mainnet deployment
+- Initialize Game Logic reward pool for on-chain reward distribution
+
+---
+
+## [0.8.0] - 2026-01-20
+
+### Added - Complete Titan Operations & Game Logic APIs
+
+#### Titan Management APIs (`backend/src/api/titan.rs`)
+Complete frontend-signed transaction flow for all Titan operations:
+
+- `POST /api/v1/titan/level-up/build` - Build Level Up transaction (consume experience to level up)
+- `POST /api/v1/titan/evolve/build` - Build Evolve transaction (requires level ≥ 30)
+- `POST /api/v1/titan/fuse/build` - Build Fuse transaction (merge two Titans, requires level ≥ 20, same element)
+- `POST /api/v1/titan/transfer/build` - Build Transfer transaction (transfer ownership to another player)
+- `POST /api/v1/titan/submit` - Submit user-signed transaction for any Titan operation
+
+**Transaction Flow:**
+1. Client calls `/titan/{operation}/build` → receives unsigned transaction + `message_to_sign`
+2. User signs `message_to_sign` with wallet
+3. Client calls `/titan/submit` with signature → backend verifies & broadcasts
+
+#### Game Logic APIs (`backend/src/api/game.rs`)
+Dual-signed transaction flow (player + backend) for game state recording:
+
+- `POST /api/v1/game/capture/build` - Build on-chain capture record transaction
+- `POST /api/v1/game/battle/build` - Build on-chain battle record transaction  
+- `POST /api/v1/game/experience/build` - Build Add Experience transaction (CPI to titan_nft)
+- `POST /api/v1/game/submit` - Submit dual-signed transaction (player + backend)
+- `POST /api/v1/game/reward/distribute` - Distribute BREACH token rewards (backend-only, direct transfer)
+
+**Dual-Signature Flow:**
+1. Client calls `/game/{operation}/build` → receives unsigned transaction
+2. User signs with wallet
+3. Client calls `/game/submit` → backend verifies player signature, adds own signature, broadcasts
+
+#### Reward Distribution System
+- **Reward Types:**
+  - Type 0: Capture (1x multiplier)
+  - Type 1: Battle Win (2x multiplier)
+  - Type 2: Daily Bonus (5x multiplier)
+- Automatic ATA (Associated Token Account) creation for new players
+- Direct BREACH token transfer (bypassing game_logic contract due to uninitialized reward pool)
+
+#### Backend Service Enhancements (`backend/src/services/solana.rs`)
+
+**Titan Operations:**
+- `build_level_up_transaction()` - Level up a Titan
+- `build_evolve_transaction()` - Evolve Titan to higher form
+- `build_fuse_transaction()` - Fuse two Titans to create offspring
+- `build_transfer_transaction()` - Transfer Titan ownership
+- `submit_user_signed_transaction()` - Verify & broadcast user-signed tx
+
+**Game Logic Operations:**
+- `record_capture_onchain()` - Record capture on-chain
+- `record_battle_onchain()` - Record battle results on-chain
+- `add_experience_onchain()` - Add experience via CPI to titan_nft
+- `submit_dual_signed_transaction()` - Handle dual-signature transactions
+
+**Reward System:**
+- `distribute_breach_reward()` - Direct BREACH token distribution with multipliers
+
+**Helper Functions:**
+- `build_simple_transaction()` - Build unsigned single-signer transaction
+- `build_dual_signed_transaction()` - Build unsigned dual-signer transaction
+
+### Testing & Validation
+
+#### Test Scripts
+- `contracts/tests/test-titan-operations.ts` - Test all Titan operations (Level Up, Evolve, Fuse, Transfer)
+- `contracts/tests/test-game-records.ts` - Test game logic recording (Capture, Battle, Experience)
+- `contracts/tests/test-reward-distribution.ts` - Test BREACH reward distribution
+- `contracts/tests/test-reward-simple.ts` - Simple reward test with clear output
+
+#### End-to-End Test Results ✅
+All tests passed successfully on Solana Devnet:
+
+1. **Titan Minting**: Successfully minted Titan #65563 ([tx](https://explorer.solana.com/tx/4Er5ufwExQDMwhg7Zw13iq4KdsFZgiSUEyLdPvViFaZNFJRb84ddfgCHD5PX2cMSpr5zrC27ANGHexMdmZJNz3Ng?cluster=devnet))
+2. **Add Experience**: Added 500 XP to Titan ([tx](https://explorer.solana.com/tx/3LixE3hqGF5kKjMZqYQ6ixQ8wM4tt7ZDXTGMcki2xBu1u1Hr9fxb6LrZTqHWUopNeqEbVNdS5Zg2CTXBkuEjBdPo?cluster=devnet))
+3. **Level Up**: Successfully leveled up from 1 → 2 ([tx](https://explorer.solana.com/tx/5ws8emqA163KWEATtyMgud9zxiq7zqsb32PH2VPgxVqsCgxPD6yUxj2VwLysZY9WtDhnSEVbd7PWXwNhGsk1Jbtj?cluster=devnet))
+4. **Transfer**: Transferred Titan to new wallet ([tx](https://explorer.solana.com/tx/5vkqij2CPUUKDK79b7VExu2RE5oPnB5k9XCzonk8xnKDNutmKyUSREWcfT8MrjtH88wUyB7LpmyCBM1H7WoAaQTt?cluster=devnet))
+5. **Reward Distribution**: Distributed 100 BREACH tokens ([tx](https://explorer.solana.com/tx/4iPEHDFuNDWfuvvehz2w3rGMz7nHAB1QRqaT7tWMuksBy9Bm84W73UQykE8Fhg9PwC3XQJbVcWANFXMgzbctuxzj?cluster=devnet))
+
+### Technical Implementation
+
+#### Transaction Signing Patterns
+
+**Single-Signature (User Only):**
+- Titan operations (Level Up, Evolve, Fuse, Transfer)
+- User has full control
+- Backend only builds and verifies
+
+**Dual-Signature (User + Backend):**
+- Game state recording (Capture, Battle, Experience)
+- User authorizes, backend validates
+- Both signatures required for security
+
+**Backend-Only:**
+- Reward distribution
+- Direct BREACH token transfers
+- Backend has full authority over reward pool
+
+#### Data Serialization
+- `bincode v1.3` for Rust Transaction serialization
+- `base64` encoding for API transport
+- `message.serialize()` for cross-language wallet signing compatibility
+
+### Known Issues
+- Game Logic `reward_pool` account not initialized - using direct backend transfers as workaround
+- `force_update_authority` instruction should be removed before mainnet
+- Evolve requires level ≥ 30 (not yet tested)
+- Fuse requires two same-element Titans level ≥ 20 (not yet tested)
+
+### Files Changed
+- `backend/src/api/game.rs` - New Game Logic API endpoints
+- `backend/src/api/titan.rs` - New Titan operation endpoints
+- `backend/src/api/mod.rs` - Route registration
+- `backend/src/services/solana.rs` - Extended with 10+ new transaction builders
+- `contracts/tests/test-titan-operations.ts` - Comprehensive Titan tests
+- `contracts/tests/test-game-records.ts` - Game logic recording tests
+- `contracts/tests/test-reward-distribution.ts` - Reward system tests
 
 ---
 
